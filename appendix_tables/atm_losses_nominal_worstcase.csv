@@ -1,0 +1,3 @@
+Scenario,Elevation_deg,Horizontal_km,Slant_path_km,Rain_dB,Fog_dB,Gas_dB,Scintillation_dB,Total_dB
+Nominal,21.75,50,54,15.65,0.02,1.81,4.37,21.85
+Worst-case,11.3,100,102,29.59,0.04,3.43,9.53,42.59

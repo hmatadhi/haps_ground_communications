@@ -1,0 +1,73 @@
+# HAPS Ground Communications Project Requirements
+# Generated: 2026-08-30
+#
+# Python Version: 3.8+
+# Minimum versions are specified; later versions should also work.
+
+# ============================================================================
+# REQUIRED CORE PACKAGES
+# ============================================================================
+
+# Scientific Computing
+numpy>=2.0.0            # Array operations, numerical computing
+scipy>=1.0.0            # Scientific computing utilities
+pandas>=2.0.0           # Data frames, CSV handling
+
+# Plotting and Visualization
+matplotlib>=3.0.0       # Publication-quality figures, PNG/PDF export
+
+# ============================================================================
+# OPTIONAL PACKAGES (for extended functionality)
+# ============================================================================
+
+# Data analysis & machine learning
+# scikit-learn>=0.24.0       # Machine learning (optional)
+# scikit-image>=0.19.0       # Image processing (optional)
+
+# Development & Testing (optional)
+# pytest>=6.0.0              # Testing framework
+# black>=21.0.0              # Code formatter
+# flake8>=3.9.0              # Linting
+
+# ============================================================================
+# INSTALLATION INSTRUCTIONS
+# ============================================================================
+#
+# Standard Installation:
+#   pip install -r requirements.txt
+#
+# WSL with quantum_env:
+#   conda activate quantum_env
+#   pip install -r requirements.txt
+#
+# Create isolated virtual environment:
+#   python -m venv haps_env
+#   source haps_env/bin/activate  # Linux/macOS
+#   .\haps_env\Scripts\activate   # Windows
+#   pip install -r requirements.txt
+#
+# Upgrade existing packages:
+#   pip install --upgrade -r requirements.txt
+#
+# ============================================================================
+# PACKAGE DESCRIPTIONS
+# ============================================================================
+#
+# numpy (2.4.4+)
+#   - Array operations and numerical computing
+#   - Used by: channel_model.py, all generators
+#
+# scipy (1.17.1+)
+#   - Scientific computing: statistics, signal processing
+#   - Used by: channel_model.py for mathematical functions
+#
+# pandas (3.0.2+)
+#   - DataFrames, CSV export/import
+#   - Used by: generators for table output, data export
+#
+# matplotlib (3.10.9+)
+#   - Plotting and visualization
+#   - Used by: All generators for figure creation
+#   - Output formats: PNG (dpi=150), PDF
+#
+# ============================================================================

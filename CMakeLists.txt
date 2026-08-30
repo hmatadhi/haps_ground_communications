@@ -4,42 +4,29 @@ project(HAPS_AI_HW_ChannelModel LANGUAGES NONE)
 # CMake is reserved for Python-generated tables and figures.
 # The LaTeX paper itself is built via build-paper.bat.
 
-find_package(Python3 COMPONENTS Interpreter QUIET)
+set(GENERATE_SCRIPT "${CMAKE_SOURCE_DIR}/src/generate_all_wsl.sh")
 
-set(GENERATE_TABLES_SCRIPT "${CMAKE_SOURCE_DIR}/scripts/generate_tables.py")
-set(GENERATE_FIGURES_SCRIPT "${CMAKE_SOURCE_DIR}/scripts/generate_figures.py")
-
-if(Python3_FOUND)
-  if(EXISTS "${GENERATE_TABLES_SCRIPT}" OR EXISTS "${GENERATE_FIGURES_SCRIPT}")
-    add_custom_target(generate_figures_and_tables
-      COMMAND ${CMAKE_COMMAND} -E echo "Generating tables and figures from Python scripts..."
-      COMMAND ${Python3_EXECUTABLE} ${GENERATE_TABLES_SCRIPT}
-      COMMAND ${Python3_EXECUTABLE} ${GENERATE_FIGURES_SCRIPT}
-      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-      COMMENT "Running Python figure/table generation"
-      VERBATIM
-    )
-  else()
-    add_custom_target(generate_figures_and_tables
-      COMMAND ${CMAKE_COMMAND} -E echo "No Python generator scripts found yet. Add scripts/generate_tables.py and/or scripts/generate_figures.py."
-      WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-      COMMENT "No generators configured yet"
-      VERBATIM
-    )
-  endif()
+# WSL bash is the only supported method (requires quantum_env)
+if(EXISTS "${GENERATE_SCRIPT}")
+  add_custom_target(generate_figures_and_tables
+    COMMAND bash ${GENERATE_SCRIPT}
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/src
+    COMMENT "Running figure/table generation via WSL bash (quantum_env required)"
+    VERBATIM
+  )
 else()
   add_custom_target(generate_figures_and_tables
-    COMMAND ${CMAKE_COMMAND} -E echo "Python3 not found. Install Python to enable table/figure generation."
+    COMMAND ${CMAKE_COMMAND} -E echo "src/generate_all_wsl.sh not found."
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    COMMENT "Python generation disabled"
+    COMMENT "Generate script not found"
     VERBATIM
   )
 endif()
 
-# Convenience target for future figure/table regeneration.
+# Convenience target for figure/table regeneration
 add_custom_target(generate
   DEPENDS generate_figures_and_tables
-  COMMENT "Generate paper artifacts via Python"
+  COMMENT "Generate paper artifacts via WSL bash with quantum_env"
 )
 
 # Keep the paper compile outside CMake using build-paper.bat.
@@ -57,3 +44,7 @@ add_custom_target(clean-paper
   COMMENT "Removing generated LaTeX files"
   VERBATIM
 )
+
+# Note: If using CMake on Windows, configure with:
+#   cmake .. -G "Unix Makefiles"
+# or use the Python/Bash scripts directly instead

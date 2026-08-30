@@ -1,0 +1,222 @@
+\documentclass[tikz, border=15pt]{standalone}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usetikzlibrary{arrows.meta, shapes.geometric, calc}
+
+\begin{document}
+
+% Define custom colors
+\definecolor{skyblueserver}{RGB}{30, 144, 255}   % Blue for Server
+\definecolor{interfereorange}{RGB}{255, 69, 0}   % Orange/Red for Interference
+\definecolor{gatewaygray}{RGB}{105, 105, 105}   % Dark Gray for Gateway
+\definecolor{groundgreen}{RGB}{46, 139, 87}      % Sea Green for Ground plane
+\definecolor{atmospherecyan}{RGB}{72, 209, 204} % Medium Turquoise for Atmosphere plane
+\definecolor{skyblueplane}{RGB}{135, 206, 250}   % Light Sky Blue for stratosphere plane
+
+
+
+% Macro for drawing stylized HAPS aeroplane
+\newcommand{\drawairplane}[3]{ % {coordinate}{color}{label}
+  \begin{scope}[shift={#1}, scale=0.45, rotate=-30]
+    % Fuselage
+    \draw[fill=#2!80!black, draw=black, line width=0.6pt, rounded corners=0.8pt] 
+      (-0.1, -0.6) -- (0.1, -0.6) -- (0.1, 0.6) -- (0, 0.8) -- (-0.1, 0.6) -- cycle;
+    % Wings
+    \draw[fill=#2!60!white, draw=black, line width=0.6pt, rounded corners=1.5pt] 
+      (-1.2, 0) -- (1.2, 0) -- (1.0, -0.15) -- (-1.0, -0.15) -- cycle;
+    % Tail
+    \draw[fill=#2!60!white, draw=black, line width=0.6pt, rounded corners=0.8pt] 
+      (-0.4, -0.5) -- (0.4, -0.5) -- (0.3, -0.58) -- (-0.3, -0.58) -- cycle;
+    % Engines
+    \draw[fill=gray!50, draw=black, line width=0.4pt] (-0.4, 0.05) circle (0.05);
+    \draw[fill=gray!50, draw=black, line width=0.4pt] (0.4, 0.05) circle (0.05);
+    % Label
+    \node[above=8pt, font=\scriptsize\sffamily\bfseries, text=black, fill=white, fill opacity=0.8, text opacity=1, rounded corners=1pt, inner sep=1.5pt] at (0, 0.4) {#3};
+  \end{scope}
+}
+
+% Macro for drawing a stylized UE handset
+\newcommand{\handset}[2]{ % {coordinate}{label}
+  \begin{scope}[shift={#1}, scale=0.7]
+    % Phone Body
+    \draw[fill=gray!90!black, draw=black, rounded corners=1pt, line width=0.6pt] (-0.1, 0) rectangle (0.1, 0.35);
+    % Screen
+    \draw[fill=cyan!20, draw=black!70, line width=0.4pt] (-0.08, 0.1) rectangle (0.08, 0.3);
+    % Antenna
+    \draw[line width=0.8pt, black] (0.05, 0.35) -- (0.05, 0.42);
+    % Text Label
+    \node[below=3pt, font=\scriptsize\sffamily\bfseries] at (0,0) {#2};
+  \end{scope}
+}
+
+% Macro for drawing a quadcopter UAV drone
+\newcommand{\drone}[2]{ % {coordinate}{label}
+  \begin{scope}[shift={#1}, scale=0.6]
+    % Central body
+    \draw[fill=darkgray!80, draw=black, line width=0.6pt] (-0.12, -0.06) rectangle (0.12, 0.06);
+    % Rotor Arms
+    \draw[line width=1.5pt, black!80] (-0.3, 0.15) -- (0.3, -0.15);
+    \draw[line width=1.5pt, black!80] (-0.3, -0.15) -- (0.3, 0.15);
+    % Motors and Rotors
+    \foreach \x/\y in {-0.3/0.15, 0.3/-0.15, -0.3/-0.15, 0.3/0.15} {
+      \draw[fill=black] (\x, \y) circle (0.05);
+      \draw[line width=0.6pt, gray!80!black] (\x-0.12, \y) -- (\x+0.12, \y);
+    }
+    % Label
+    \node[below=5pt, font=\scriptsize\sffamily\bfseries] at (0,-0.15) {#2};
+  \end{scope}
+}
+
+% Macro for drawing the Gateway dish antenna on a tower
+\newcommand{\gateway}[3]{ % {coordinate}{label}{tower_height}
+  \begin{scope}[shift={#1}]
+    % Support tower
+    \draw[line width=2pt, gray!70!black] (0, 0, 0) -- (0, 0, #3);
+    \draw[line width=1pt, gray!70!black] (-0.15, 0, 0) -- (0, 0, #3/2) -- (0.15, 0, 0);
+    % Dish base / pivot
+    \draw[fill=gray!80!black, draw=black] (0, 0, #3) circle (0.06);
+    % Parabolic dish pointing up and left (towards the Server Node)
+    \begin{scope}[shift={(0,0,#3)}, rotate=40]
+      \draw[fill=gray!30, draw=black, line width=0.8pt] (-0.25, 0.05) arc (160:320:0.25) -- cycle;
+      \draw[line width=0.8pt, black] (0, 0) -- (0.15, 0.15); % feed horn
+    \end{scope}
+    % Label
+    \node[right=6pt, font=\scriptsize\sffamily\bfseries, align=left] at (0, 0, #3) {#2};
+  \end{scope}
+}
+
+\begin{tikzpicture}[
+  x={(0.866cm,0.5cm)},
+  y={(-0.866cm,0.5cm)},
+  z={(0cm,1cm)},
+  scale=1.2,
+  >=latex
+]
+
+  %=========================================
+  % 1. DRAW VERTICAL ALTITUDE SCALE AXIS
+  %=========================================
+  \draw[line width=1pt, -{Stealth[scale=1.2]}, black!70] (-5.0, -4.5, 0) -- (-5.0, -4.5, 12.5) 
+    node[above, font=\scriptsize\sffamily\bfseries, align=center] {Altitude\\(z)};
+  
+  % Axis ticks and labels
+  \draw[line width=1pt, black!70] (-5.1, -4.5, 0) -- (-4.9, -4.5, 0);
+  \node[left=3pt, font=\scriptsize\sffamily\bfseries, text=black!80] at (-5.0, -4.5, 0) {Ground (0 m)};
+
+  \draw[line width=1pt, black!70] (-5.1, -4.5, 4) -- (-4.9, -4.5, 4);
+  \node[left=3pt, font=\scriptsize\sffamily\bfseries, text=black!80] at (-5.0, -4.5, 4) {Atmosphere};
+
+  %\draw[line width=1pt, black!70] (-5.1, -4.5, 8) -- (-4.9, -4.5, 12);
+  \node[left=3pt, font=\scriptsize\sffamily\bfseries, text=black!80] at (-5.0, -4.5, 11) {Stratosphere (20 km)};
+
+  %=========================================
+  % 2. LAYER 1: GROUND LEVEL (z = 0)
+  %=========================================
+  % Semi-transparent ground plane grid/parallelogram
+  \draw[fill=groundgreen!12, opacity=0.35, draw=groundgreen!50, line width=1pt] 
+    (-4.5, -4.5, 0) -- (4.5, -4.5, 0) -- (4.5, 4.5, 0) -- (-4.5, 4.5, 0) -- cycle;
+  \node[anchor=south west, font=\tiny\sffamily\bfseries, text=groundgreen!80!black] at (-4.4, -4.4, 0) {GROUND LEVEL};
+
+  % Draw UEs on the ground
+  \handset{(-1.5, -2, 0)}{UE1}
+  \handset{(0, -1, 0)}{UE2}
+  \handset{(1.5, -2, 0)}{UE3}
+
+  % Draw Gateway tower (Z=0 to Z=0.6, representing 50m relative height)
+  % Situated horizontally offset from Server Node (which is at (0, -2.5, 8))
+  \gateway{(2.2, -2.5, 0)}{Gateway}{0.6}
+
+  % Dimension helper lines for the Gateway's scale (50m height, 500m horizontal distance)
+   \draw[dotted, gray, line width=0.4pt] (0, -2.5, 0) -- (0, -2.5, 8);
+  \draw[dashed, gray, line width=0.4pt] (0, -2.5, 0) -- (2.2, -2.5, 0);
+  \draw[<->, gray, line width=0.5pt] (0, -2.5, -0.3) -- (2.2, -2.5, -0.3) 
+    node[midway, below, font=\tiny\sffamily\bfseries, rotate=30] {500 m horizontal offset from Nadir};
+  \draw[<->, gray, line width=0.5pt] (2.8, -2.5, 0) -- (2.8, -2.5, 0.6) 
+    node[midway, right, font=\tiny\sffamily\bfseries] {50 m};
+
+  %=========================================
+  % 3. LAYER 2: ATMOSPHERE LEVEL (z = 4)
+  %=========================================
+  % Semi-transparent middle plane (dashed boundary)
+  \draw[fill=atmospherecyan!8, opacity=0.2, draw=atmospherecyan!40, dashed, line width=0.8pt] 
+    (-4.5, -4.5, 4) -- (4.5, -4.5, 4) -- (4.5, 4.5, 4) -- (-4.5, 4.5, 4) -- cycle;
+  \node[anchor=south west, font=\tiny\sffamily\bfseries, text=atmospherecyan!80!black] at (-4.4, -4.4, 4) {Atmosphere};
+
+  % Draw UAV drone at the Atmosphere level
+  \drone{(-1.0, -1.5, 4)}{UAV Relay (500 meter)}
+
+  %=========================================
+  % 4. LAYER 3: Stratosphere LEVEL (z = 8)
+  %=========================================
+  % Semi-transparent top plane
+  \draw[fill=skyblueplane!10, opacity=0.2, draw=skyblueplane!50, line width=1pt] 
+    (-4.5, -4.5, 8) -- (4.5, -4.5, 8) -- (4.5, 4.5, 8) -- (-4.5, 4.5, 8) -- cycle;
+  %\node[anchor=south west, font=\tiny\sffamily\bfseries, text=skyblueserver!80!black] at (-4.4, -4.4, 8) {Stratosphere (20km LEVEL)};
+
+  % Equilateral Triangle helper outline in the stratosphere plane
+  \draw[dashed, line width=0.8pt, black!30] (0, -2.5, 8) -- (2.16, 1.25, 8) -- (-2.16, 1.25, 8) -- cycle;
+
+  % Draw the 3 airplanes at the vertices of the equilateral triangle
+  % 1) Server Node (Blue)
+  \drawairplane{(0, -2.5, 8)}{skyblueserver}{Server Node1}
+  % 2) Interfere Node 1 (Gray/Red)
+  \drawairplane{(2.16, 1.25, 8)}{interfereorange}{Interfere Node2}
+  % 3) Interfere Node 2 (Gray/Red)
+  \drawairplane{(-2.16, 1.25, 8)}{interfereorange}{Interfere Node3}
+
+
+  %=========================================
+  % 5. CONNECTION LINKS (INTER-TIER COEXISTENCE)
+  %=========================================
+
+  % Thick blue lines joining Server Node with UE1, UE2, UE3
+  \draw[line width=1.5pt, skyblueserver] (0, -2.5, 8) -- (-1.5, -2, 0);
+  \draw[line width=1.5pt, skyblueserver] (0, -2.5, 8) -- (0, -1, 0);
+  \draw[line width=1.5pt, skyblueserver] (0, -2.5, 8) -- (1.5, -2, 0);
+
+  % Dashed orange lines joining Interferer Nodes with UE1, UE2, UE3
+  % Interferer Node 1
+  \draw[dashed, line width=1pt, interfereorange] (2.16, 1.25, 8) -- (-1.5, -2, 0);
+  \draw[dashed, line width=1pt, interfereorange] (2.16, 1.25, 8) -- (0, -1, 0);
+  \draw[dashed, line width=1pt, interfereorange] (2.16, 1.25, 8) -- (1.5, -2, 0);
+
+  % Interferer Node 2
+  \draw[dashed, line width=1pt, interfereorange] (-2.16, 1.25, 8) -- (-1.5, -2, 0);
+  \draw[dashed, line width=1pt, interfereorange] (-2.16, 1.25, 8) -- (0, -1, 0);
+  \draw[dashed, line width=1pt, interfereorange] (-2.16, 1.25, 8) -- (1.5, -2, 0);
+
+  % Doubly thick blue line joining Server Node with Gateway (Double Feeder Link style)
+  \draw[double=skyblueserver!20, double distance=2.5pt, line width=1.2pt, skyblueserver!80!black] 
+    (0, -2.5, 8) -- (2.2, -2.5, 0.6);
+
+  %=========================================
+  % 6. FLAT 2D DIAGRAM LEGEND
+  % Resetting coordinates inside the scope for a perfect 2D box overlay
+  %=========================================
+  \begin{scope}[x={(1cm,0cm)}, y={(0cm,1cm)}, z={(0cm,0cm)}, shift={(3.8cm, 6.2cm)}, scale=0.85]
+    % Legend box border
+    \draw[fill=white, draw=black!20, rounded corners=3pt, line width=0.6pt] 
+      (-0.2, -1.8) rectangle (3.6, 0.4);
+    \node[anchor=west, font=\scriptsize\sffamily\bfseries] at (0, 0.1) {Diagram Legend};
+    
+    % Server Feeder Link (Double Line)
+    \draw[double=skyblueserver!20, double distance=1.8pt, line width=0.8pt, skyblueserver!80!black] 
+      (0, -0.3) -- (0.8, -0.3);
+    \node[anchor=west, font=\tiny\sffamily] at (1.0, -0.3) {Server Feeder Link};
+
+    % Server Service Link (Thick Blue)
+    \draw[line width=1.5pt, skyblueserver] (0, -0.7) -- (0.8, -0.7);
+    \node[anchor=west, font=\tiny\sffamily] at (1.0, -0.7) {Server Service Link};
+
+    % Interfere Link (Dashed Orange)
+    \draw[dashed, line width=1.2pt, interfereorange] (0, -1.1) -- (0.8, -1.1);
+    \node[anchor=west, font=\tiny\sffamily] at (1.0, -1.1) {Interference Link};
+    
+    % Constellation Perimeter
+    \draw[dashed, line width=0.8pt, black!30] (0, -1.5) -- (0.8, -1.5);
+    \node[anchor=west, font=\tiny\sffamily] at (1.0, -1.5) {Constellation Perimeter};
+  \end{scope}
+
+\end{tikzpicture}
+
+\end{document}

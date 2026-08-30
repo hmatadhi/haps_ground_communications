@@ -1,0 +1,14 @@
+Distance_km,Frequency_GHz,Frequency_Name,Path_Loss_Blended_dB,Link_Type
+0.0,2.0,2 GHz (Service),124.5,Service
+10.0,2.0,2 GHz (Service),125.5,Service
+20.0,2.0,2 GHz (Service),127.5,Service
+30.0,2.0,2 GHz (Service),129.6,Service
+50.0,2.0,2 GHz (Service),133.1,Service
+75.0,2.0,2 GHz (Service),136.3,Service
+100.0,2.0,2 GHz (Service),138.6,Service
+0.0,38.0,38 GHz (Feeder),150.0,Feeder
+0.05,38.0,38 GHz (Feeder),150.0,Feeder
+0.1,38.0,38 GHz (Feeder),150.0,Feeder
+0.2,38.0,38 GHz (Feeder),150.0,Feeder
+0.3,38.0,38 GHz (Feeder),150.0,Feeder
+0.5,38.0,38 GHz (Feeder),150.0,Feeder
