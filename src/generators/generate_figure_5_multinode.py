@@ -68,8 +68,8 @@ for text in legend.get_texts():
     text.set_color('#333333')
 
 plt.tight_layout()
-plt.savefig('output/5_multi_node_sinr.png', facecolor='#FFFFFF', dpi=150, bbox_inches='tight')
-print("Success: Chart '5_multi_node_sinr.png' generated.")
+plt.savefig('output/figure5_multi_haps_sinr_mean.png', facecolor='#FFFFFF', dpi=150, bbox_inches='tight')
+print("Success: Chart 'figure5_multi_haps_sinr_mean.png' generated.")
 plt.close()
 
 # Print statistics for all landscapes

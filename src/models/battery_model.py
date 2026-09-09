@@ -119,8 +119,9 @@ class HAPSBatteryModel:
         # Energy change over 1 hour (Wh)
         energy_change_wh = p_net * 1.0  # 1 hour
 
-        # New SoC
-        new_soc_percent = current_soc_percent + (energy_change_wh / self.battery_capacity)
+        # New SoC (energy_change_wh / capacity is a fraction of capacity;
+        # scale to percentage points before adding to a percent value)
+        new_soc_percent = current_soc_percent + 100.0 * (energy_change_wh / self.battery_capacity)
         new_soc_percent = np.clip(new_soc_percent, 0.0, 100.0)
 
         debug = {

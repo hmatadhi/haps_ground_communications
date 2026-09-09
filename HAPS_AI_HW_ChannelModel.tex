@@ -45,9 +45,22 @@
 \maketitle
 
 \begin{abstract}
-This paper presents a simulation and validation study for an AI-driven HAPS--UAV--Ground access network, centered on the spatial SINR heterogeneity induced by a fixed 3-HAPS equilateral-triangle constellation across its service footprint. Following Arani \emph{et al.}, we implement 
-(i) a free-space model for the High-Altitude Platform Station (HAPS) link, (ii) the exact building-blockage line-of-sight (LoS) probability series for the Unmanned-Aerial-Vehicle (UAV) links, (iii) the resulting average path loss and downlink signal-to-interference-plus-noise
-ratio (SINR) under this constellation geometry, and  (iv) comprehensive ITU-R atmospheric losses (rain, fog, gas, scintillation) for feeder-link design. The channel model is realised in Python (NumPy $+$ Matplotlib $+$ itur package) and characterised through signal-quality curves, spatial-heterogeneity analysis, and atmospheric sensitivity results.
+
+This paper presents a simulation and validation
+study for an AI-driven HAPS–UAV–Ground access network,
+addressing challenges like SINR heterogeneity induced by a fixed
+3-HAPS equilateral-triangle constellation across its service foot-
+print. Following Arani et al., we implement (i) a free-space model
+for the High-Altitude Platform Station (HAPS) link, (ii)
+building-blockage line-of-sight (LoS) probability series for the
+Unmanned-Aerial-Vehicle (UAV) links, (iii) average
+path loss and downlink signal-to-interference-plus-noise ratio
+(SINR) under this constellation geometry, and (iv) comprehensive
+ITU-R atmospheric losses (rain, fog, gas, scintillation) for feeder-
+link design. The channel model is realised in Python (NumPy +
+Matplotlib + itur package) and characterised through signal-
+quality curves, spatial-heterogeneity analysis, and atmospheric
+sensitivity results.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -60,25 +73,9 @@ HAPS, UAV, non-terrestrial networks, air-to-ground channel, LoS probability, SIN
 
 \subsection{Platform Overview}
 
-In an HAPS-anchored access network, a fixed high-altitude platform and a fleet of
-UAVs together act as aerial base stations (ABSs) serving mobile ground users. A
-controller must eventually decide \emph{where each UAV sits} and \emph{which
-channel it uses} so that users are served fairly and reliably, a task that naturally
-is cast as deep reinforcement learning~\cite{arani2023,bakambekova2024}. Any such
-controller computes its reward from user data rates, which are only as trustworthy
-as the underlying propagation model. As shown in \S IV, the dominant driver of that
-reward signal is not the distance from the nadir but the angular position within the fixed
-3-HAPS constellation -- a purely geometric effect that a distance-only heuristic
-cannot capture, and the central case for using DRL rather than simpler scheduling
-rules here.
+In this HAPS-anchored access network, a fixed HAPS and a fleet of UAVs jointly serve mobile ground users. The control problem is to decide each UAV’s position and channel assignment so that users are served fairly and reliably. Since the reward is computed from user data rates, which depend on the underlying propagation geometry, a simple distance-based heuristic is insufficient. This motivates a DRL-based controller, which learns the joint placement and channel-selection policy directly from the network state.
 
-A typical HAPS platform involves stratospheric solar-powered unmanned aerial vehicles
-operating at a nominal altitude of 20 km. At this altitude, the platform maintains a fixed
- service area despite continuous circular flight patterns and variations in attitude(the 
-orientation/angular state of the vehicle: roll, pitch and yaw.).
- Each platform supports a service radius of up to 100 km~\cite{itu_m2101,itu_m2106}.
-
-It communicates with the equipment on the ground using
+A typical HAPS system consists of a stratospheric, solar-powered platform operating at approximately 20 km altitude. At this altitude, it maintains a fixed service footprint while undergoing continuous circular flight and attitude variations (roll, pitch, and yaw), supporting a service radius of up to 100 km~\cite{itu_m2101,itu_m2106}. It communicates with ground equipment through
 
 \begin{itemize}
   \item {Feeder-link: HAPS to Gateway, f = 38 -- 39.5 GHz (Ka-band)~\cite{itu_m2101}} \\
@@ -348,6 +345,13 @@ the two are probability-averaged:
 
 \noindent\textbf{Equation (10) --- Probability-Averaged Path Loss}: The first line computes path loss (free-space FSPL plus environment-dependent excess $\eta_z$) for LoS and NLoS states separately. The second line probability-averages over the LoS state (Eq. 8). The 3D distance is $d_\mathrm{3D}=\sqrt{r^2+(h_u-h_k)^2}$ where $r$ is horizontal distance and $h_u, h_k$ are UAV and user altitudes respectively.
 
+The received power follows the standard link-budget relation
+\begin{equation}
+P_r = P_t + G_t + G_r - PL(d,\theta,\mathrm{state}),
+\label{eq:rx-power}
+\end{equation}
+where $P_t$ is transmit power, $G_t$ and $G_r$ are the transmit and receive antenna gains, and $PL(d,\theta,\mathrm{state})$ is the path loss for the current geometry and propagation state. A blocked or NLoS link therefore yields a smaller $P_r$ through a larger path-loss term (equivalently, a lower channel gain $g_{u,k}$); it is not added as a separate degradation term in the SINR expression itself. The reduced signal power is already embedded in the SINR numerator before interference and noise are considered.
+
 The downlink SINR is
 \begin{equation}
 \gamma_{u,k} = \frac{p_u\,g_{u,k}}{\sum_{u'\neq u} p_{u'} g_{u',k} + \sigma_0^2},
@@ -357,6 +361,39 @@ The downlink SINR is
 
 \noindent\textbf{Equation (11) --- Signal-to-Interference-plus-Noise Ratio (SINR)}: Computes downlink SINR at user $k$ from UAV $u$ per standard information-theory formulation. $p_u$ is transmit power [Watts], $g_{u,k}=10^{-\overline{\mathrm{PL}}/10}$ is channel gain (reciprocal of path loss in linear scale), interference sums over competing UAVs $u'$, and $\sigma_0^2$ is thermal noise power [Watts]. For the noise-limited characterization below, interference is negligible; the characterisation below is
 noise-limited.
+
+\subsection{III.D: Multi-HAPS User Association -- State and Baseline Policies}
+\label{sec:assoc-baseline-setup}
+
+Building on the 3-HAPS constellation (Table~\ref{tab:config}) and the SINR model of
+Sections~III.A--III.C, this section defines a per-user association experiment: each
+of $N=50$ users, once per simulated hour, observes its SINR to each of the 3 HAPS
+(dB, Eq.~\eqref{eq:sinr}), its horizontal distance to each (km), each HAPS's battery
+state of charge (\%), and the current weather (rain rate, visibility, hour of day).
+One episode is one simulated day (24 hourly steps). Per episode, user positions and
+each HAPS's initial battery SoC ($\mathcal{U}(30,100)\,\%$) are drawn once and held
+fixed; weather is drawn once per episode (\texttt{WeatherScenarioGenerator},
+\texttt{random\_mix} mode). Each HAPS's battery is charged by a fixed diurnal solar
+profile and discharged by a constant platform/feeder draw plus its currently-associated
+users' share of load ($P_{k,\text{user}}=1$~W per user, ASSUMED); the solar/platform
+terms dominate, so time-of-day remains the primary driver of SoC and the association
+policy has a secondary, but non-trivial, effect on it. Rain de-rates only the
+feeder-link throughput credit (Section~\ref{subsec:multinode-sinr}), not the 2~GHz
+service SINR.
+
+Two closed-form (non-learned) association policies are evaluated here:
+\begin{itemize}\setlength{\itemsep}{0pt}
+  \item \textbf{Random}: uniform-random platform choice each hour (sanity floor).
+  \item \textbf{Max-SINR}: each user always associates to $\arg\max_p \text{SINR}_{k,p}$
+    -- pure closed-form physics, no memory of battery or fairness state, no learning.
+\end{itemize}
+Both are evaluated over 50 held-out episodes (seed 999) using Jain's fairness index,
+outage fraction (SINR below $-2$~dB, the severe-outage threshold measured in
+Section~IV.B/Table A.3), and aggregate throughput (Shannon capacity, summed over
+users) as metrics. Section~\ref{sec:assoc-baseline-results} reports the resulting
+comparison; Section~\ref{sec:phase2-motivation} (Phase 2) later adopts this same
+per-user state and evaluates whether a learned policy can improve further on the
+closed-form baseline established there.
 
 % =====================================================================
 \section{Results}
@@ -529,10 +566,11 @@ equivalent to this linear-domain division and will produce incorrect results (Go
 
 \paragraph{LoS blockage in path loss -- tier-dependent, not universal:}
 
-An important clarification: line-of-sight (LoS) building blockage is \textbf{not an additional
-degradation term} in the SINR equation itself -- when it applies, it is \textbf{embedded in the
-path-loss calculation}, not added separately. But it does not apply uniformly to every link in this
-system. There are two physically distinct tiers:
+As already introduced in Section~III, line-of-sight blockage is not modeled as an additional degradation term in the SINR expression itself. It is embedded in the path-loss model through the effective received power,
+\begin{equation}
+P_r = P_t + G_t + G_r - PL(d,\theta,\mathrm{state}),
+\end{equation}
+so a blocked or NLoS link simply corresponds to a larger $PL$ (or lower channel gain $g_{u,k}$), and the reduced signal power is already reflected in the SINR numerator before interference and noise are considered. This distinction is important: the propagation state affects the channel gain, not the algebraic form of the SINR ratio itself. There are two physically distinct tiers:
 
 \begin{itemize}
   \item \textbf{HAPS tier (20\,km altitude) -- both the 2\,GHz direct service link and the 38\,GHz
@@ -611,28 +649,23 @@ The interference model below shows the penalty without coordination, motivating 
 DRL agent's learning objective: find an optimal transmission schedule that maximizes
 coverage and fairness while minimizing interference.
 
-\paragraph{Measurement and validation:}
+\paragraph{Measurement and validation}
 
-Two new measurement figures (Figures~\ref{fig:sinr-service-link} and~\ref{fig:sinr-feeder-link}) quantify this penalty:
-\begin{itemize}
-  \item \textbf{Figure~\ref{fig:sinr-service-link}}: 2~GHz service link SINR across 10--100\,km horizontal distances.
-    Shows SINR\_Single (ideal, no interference), SINR\_Interferers (interference power vs.\ noise),
-    and SINR\_Actual (serving link vs.\ total noise+interference). Landscape-independent (\S III.C).
-  \item \textbf{Figure~\ref{fig:sinr-feeder-link}}: 38~GHz feeder link (HAPS-to-Gateway) at 10--500\,m short-range, validating
-    the same SINR calculation on millimeter-wave with high elevation angles ($>88^\circ$). Also landscape-independent.
-\end{itemize}
-
-Both figures were generated using Equation~\eqref{eq:sinr-multinode} in strict linear domain,
-ensuring physically correct SINR degradation (decreasing with distance, not increasing). A comprehensive table of SINR values across four distances (landscape-independent, \S III.C) is provided in Appendix~\ref{sec:app-data-tables} (Table~\ref{table:app-sinr-multinode-distances}).
-
-Figure~\ref{fig:multinode-interference} quantifies this penalty across the 100\,km service footprint.
+Figure~\ref{fig:multinode-interference} quantifies the interference-induced SINR penalty across the 100 km service footprint. The penalty is defined relative to the no-interference benchmark and represents the loss in usable signal quality caused by the other HAPS nodes. In the dBm traces, the downward bend after roughly 60 km reflects the transition from an interference-limited regime to a path-loss-dominated regime: the desired received power falls faster than the interference term, so the absolute signal level continues to decay even though the interference contribution is no longer the dominant cause of degradation.
 
 The line shows mean SINR, averaged across all 24 angular positions around the constellation; since all four landscapes produce numerically identical results at the HAPS tier (\S III.C, Arani et al.\ Eq.\ 2), a single line is shown rather than four overlapping ones. The shaded band shows the min--max spread from that angular variation, not measurement uncertainty. The right-hand axis shows the corresponding elevation angle at the user (arctan of HAPS altitude over horizontal distance). Mean SINR falls from $+6.3$\,dB at 10\,km to $-4.3$\,dB at 100\,km, but the shaded band widens with distance (1.95\,dB at 10\,km to 11.94\,dB at 75\,km) -- angular position relative to the 65\,km equilateral constellation dominates over pure distance decay beyond $\sim$30\,km. The network must employ TDMA scheduling, FDMA, beamforming, or power control to manage this interference and its spatial variability.
 
 \begin{figure}[h!]\centering
-\includegraphics[width=0.95\columnwidth]{./figures/5_multi_node_sinr.png}
+\begin{subfigure}[b]{0.49\columnwidth}\centering
+\includegraphics[width=\linewidth]{./figures/figure5_multi_haps_sinr_mean.png}
+\caption{Mean SINR and angular min--max spread across 100\,km service footprint.}
+\end{subfigure}\hfill
+\begin{subfigure}[b]{0.49\columnwidth}\centering
+\includegraphics[width=\linewidth]{./figures/figure5_model_received_power.png}
+\caption{Received-power comparison showing clean vs. effective power under three-HAPS interference.}
+\end{subfigure}
 \vspace{3mm}
-\caption{Multi-HAPS interference: mean SINR and angular min--max spread across 100\,km service footprint.}
+\caption{Multi-HAPS interference characterization at the service link: (a) SINR variability and (b) received-power degradation.}
 \label{fig:multinode-interference}
 \end{figure}
 
@@ -647,14 +680,9 @@ Figure~\ref{fig:sinr-service-link} shows SINR for the 2~GHz service link along o
 \label{fig:sinr-service-link}
 \end{figure}
 
-\FloatBarrier
 
 Figure~\ref{fig:sinr-feeder-link} shows the SINR performance of the 38 GHz HAPS-to-gateway feeder link for gateway horizontal distances of 10--500 m. The gateway is assumed to be at an altitude of 50 m, while the HAPS operates at its nominal stratospheric altitude. The resulting SINR is primarily noise-limited and remains approximately constant at $-7.2$\,dB across all considered distances. This behavior is expected because the change in horizontal distance from 10 m to 500 m produces a negligible change in the HAPS-to-gateway slant range relative to the HAPS altitude.
 
-\paragraph{Why multi-HAPS interference is not applicable to feeder links:}
-The key distinction from service-link analysis is that the feeder link operates at extremely short range (0--0.5 km, typically 10--500 m), placing the gateway in \emph{proximity to the nadir} of the serving HAPS. In contrast, the interfering HAPS in the constellation are positioned approximately 65~km away from the serving HAPS (equilateral-triangle geometry, \S III.A). Consequently, the path-loss attenuation to the interfering HAPS is so severe ($\sim$120~dB at 38~GHz over 65~km) that their interference contribution remains \emph{negligibly small} compared to the receiver's thermal noise level ($-100$\,dBm assumed floor). Therefore, the feeder link is \textbf{noise-limited, not interference-limited}, unlike the service link. The resulting SINR degradation is driven primarily by the background receiver noise, not by multi-HAPS interference from the constellation.
-
-A Johnson--Nyquist thermal-noise model, $N=kTB$, or equivalently $N_{\text{dBm}}=-174+10\log_{10}(B)+NF$, would provide a more physically grounded noise estimate than the assumed flat $-100$\,dBm noise floor. However, for this short-range analysis, replacing the assumed noise floor with a bandwidth- and receiver-dependent thermal-noise value would primarily change the absolute SINR level rather than its nearly flat variation with distance. A more detailed link-budget analysis incorporating the actual channel bandwidth, receiver noise figure, directional gateway antenna gain, and HAPS transmit power is therefore deferred to the next phase. 
 
 \begin{figure}[h!]\centering
 \includegraphics[width=0.95\columnwidth]{./figures/haps_feeder_link_38ghz.png}
@@ -662,6 +690,14 @@ A Johnson--Nyquist thermal-noise model, $N=kTB$, or equivalently $N_{\text{dBm}}
 \caption{38~GHz feeder link (HAPS-to-Gateway) SINR, four identical landscape subplots (landscape-independent, \S III.C), 10--500\,m distances.}
 \label{fig:sinr-feeder-link}
 \end{figure}
+
+\FloatBarrier
+
+\paragraph{Why multi-HAPS interference is not applicable to feeder links:}
+The key distinction from service-link analysis is that the feeder link operates at extremely short range (0--0.5 km, typically 10--500 m), placing the gateway in \emph{proximity to the nadir} of the serving HAPS. In contrast, the interfering HAPS in the constellation are positioned approximately 65~km away from the serving HAPS (equilateral-triangle geometry, \S III.A). Consequently, the path-loss attenuation to the interfering HAPS is so severe ($\sim$120~dB at 38~GHz over 65~km) that their interference contribution remains \emph{negligibly small} compared to the receiver's thermal noise level ($-100$\,dBm assumed floor). Therefore, the feeder link is \textbf{noise-limited, not interference-limited}, unlike the service link. The resulting SINR degradation is driven primarily by the background receiver noise, not by multi-HAPS interference from the constellation.
+
+A Johnson--Nyquist thermal-noise model, $N=kTB$, or equivalently $N_{\text{dBm}}=-174+10\log_{10}(B)+NF$, would provide a more physically grounded noise estimate than the assumed flat $-100$\,dBm noise floor. However, for this short-range analysis, replacing the assumed noise floor with a bandwidth- and receiver-dependent thermal-noise value would primarily change the absolute SINR level rather than its nearly flat variation with distance. A more detailed link-budget analysis incorporating the actual channel bandwidth, receiver noise figure, directional gateway antenna gain, and HAPS transmit power is therefore deferred to the next phase. 
+
 
 \paragraph{2~GHz Service Link: Distance dependence}
 When averaged over all angular positions relative to the constellation, the mean SINR decreases from $+6.3$\,dB at $r=10$\,km to $+2.0$\,dB at $r=30$\,km, falls below 0\,dB between 30 and 50\,km, and reaches $-4.3$\,dB at $r=100$\,km (Figure~\ref{fig:multinode-interference}). The interference-to-noise ratio (SINR\_Interferers) remains positive, ranging from 0.95 to 4.6\,dB, throughout the 10--100\,km range.
@@ -785,6 +821,38 @@ introduces a power budget gap that scales nonlinearly with availability target.
 
 \FloatBarrier
 
+\subsection{IV.D: Multi-HAPS Association Baseline Results (Random vs.\ Max-SINR)}
+\label{sec:assoc-baseline-results}
+
+Using the setup of Section~\ref{sec:assoc-baseline-setup}, this measures the two
+closed-form association policies against each other. All numbers are measured over
+50 held-out 24-hour episodes (seed 999), 50 users.
+
+\begin{table}[t]
+\centering
+\caption{Association baseline results: 50 held-out 24-hour episodes (seed 999), 50 users, mean $\pm$ std}
+\label{tab:assoc-baseline-results}
+{\scriptsize\setlength{\tabcolsep}{3pt}
+\begin{tabularx}{\columnwidth}{|>{\raggedright\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
+\hline
+\textbf{Policy} & \textbf{Jain} & \textbf{Outage /50} & \textbf{Throughput [bits/s/Hz]}\\
+\hline
+Random & $0.331\pm0.046$ & $33.7\pm3.3$ & $33.95\pm4.75$ \\
+\hline
+Max-SINR & $\mathbf{0.700\pm0.027}$ & $\mathbf{1.0\pm0.9}$ & $\mathbf{76.18\pm3.57}$ \\
+\hline
+\end{tabularx}}
+\end{table}
+
+Even this simple, closed-form per-user rule -- always associate to whichever HAPS
+gives the best instantaneous SINR -- more than doubles Jain fairness, cuts outage by
+$34\times$ (33.7 to 1.0 of 50 users), and more than doubles aggregate throughput
+relative to random association. This confirms, at the level of a full multi-user
+network simulation, what the spatial SINR heterogeneity in Table A.3 already implied:
+association choice matters far more than any fixed or naive assignment. Section
+\ref{sec:phase2-motivation} (Phase 2) evaluates whether a learned policy can improve
+further on this closed-form baseline.
+
 % =====================================================================
 \section{Conclusion}
 % =====================================================================
@@ -829,6 +897,7 @@ Sections~\ref{subsec:scintillation} and Figures~\ref{fig:scint_fade_depth}--\ref
 Phase~2 introduces a Deep Q-Network (DQN) agent for dynamic user-to-platform association in the HAPS--UAV--Gateway network. Whereas Phase~1 characterized static link quality, Phase~2 learns real-time association decisions maximizing throughput, fairness, and energy efficiency.
 
 \subsection{Motivation: Why DRL?}
+\label{sec:phase2-motivation}
 
 The spatial SINR heterogeneity discovered in Phase~1 (9.94\,dB variation at 50\,km driven by constellation geometry alone, Figure~\ref{fig:multinode-interference}) demonstrates that distance-only scheduling heuristics fail. A simple ``always pick max SINR'' rule cannot anticipate or adapt to the angular SINR patterns created by the 3-HAPS triangle. Moreover, when weather degrades feeder links (Section~\ref{subsec:multinode-sinr}), the network must dynamically fail-over users from one platform to another while respecting battery constraints on each HAPS node.
 
@@ -900,7 +969,7 @@ P_{\text{eng}} &= \frac{1}{3}\sum_{p=1}^{3} \left(1 - \frac{\text{SoC}_p}{100}\r
 
 \subsection{Critical Implementation Fixes}
 
-Phase~2 training must avoid four silent errors:
+Phase~2 training must avoid six silent errors:
 
 \textbf{Error 1:} Jain's index on dB (wrong---log scale)
 \begin{equation}
@@ -924,6 +993,34 @@ J_{\text{correct}} = \frac{(\sum_k 10^{\text{SINR}_k/10})^2}{N \sum_k (10^{\text
 
 \textbf{Error 4:} LSTM $(24,2) \to (60,)$ resolution mismatch.
 \textbf{Fix:} Match resolution: $(24,2) \to (1,2)$ (hourly to hourly).
+
+\vspace{3pt}
+
+\textbf{Error 5:} Reward broadcast to all $N$ users identically (the fully-aggregated
+network reward $R(\mathbf{a})$ given to every user's transition, regardless of that
+user's own action). With $N=50$ simultaneously-acting users, any single user's choice
+moves $R(\mathbf{a})$ by only a small fraction of its value, so the DQN cannot tell
+which action caused the change -- training collapsed to a constant always-pick-HAPS-1
+policy (identical evaluation reward/fairness/outage across 200+ consecutive training
+episodes; verified by inspecting the learned policy's action distribution directly).
+\textbf{Fix:} Decompose the additive components of $R(\mathbf{a})$ -- $L_{\text{agg}}$
+and the outage penalties are literally sums (resp. fractions) over users -- into a
+per-user share, so each user is credited with its own throughput/outage contribution.
+$J_{\text{fair}}$ and $P_{\text{eng}}$ are genuinely network-level and remain a shared
+term. This does not change the total reward mass, only its attribution for learning.
+
+\vspace{3pt}
+
+\textbf{Error 6:} HAPS battery SoC update treats a dimensionless energy fraction as if
+it were already a percentage: $\text{SoC} \mathrel{+}= (\Delta E_{\text{Wh}} / C_{\text{battery}})$
+instead of $\text{SoC} \mathrel{+}= 100 \times (\Delta E_{\text{Wh}} / C_{\text{battery}})$.
+This under-scales every SoC update by $100\times$, so battery state barely moves
+regardless of policy (observed: SoC pinned at $\approx$65\% across all three
+Section~\ref{sec:phase2-results} policies before the fix) -- silently disabling the
+entire energy/battery term of the reward. \textbf{Fix:} apply the missing $\times100$
+conversion, and use $C_{\text{battery}}=12{,}000$~Wh matching Table~\ref{tab:config}'s
+value (the module's own uncorrected default, 1000~Wh, is 12$\times$ too small and
+produces implausible full-charge/full-drain swings within a single hour).
 
 \subsection{HAPS Battery Model}
 
@@ -969,6 +1066,103 @@ SoC clipped to $[0, 100]\,\%$:
 \end{itemize}
 
 \textbf{Thresholds:} SoC $\in [0,100]\,\%$. Critical: $< 5\%$ (shutdown); penalty: $< 10\%$ (overload). Agent learns to balance users across platforms to avoid over-draining during night.
+
+\subsection{DQN Results and Validation Against the Closed-Form Baseline}
+\label{sec:phase2-results}
+
+This section trains a DQN on the state and action space defined above (adopted
+directly from Section~\ref{sec:assoc-baseline-setup}) and evaluates it against the
+closed-form Random/Max-SINR baseline already established in Section~IV.D
+(Table~\ref{tab:assoc-baseline-results}) -- the question this paper's own Motivation
+(Section~\ref{sec:phase2-motivation}) raises but does not itself measure. All numbers
+below are measured, not asserted.
+
+The DQN (shared network across all 50 users; Critical Implementation Fixes 5--6
+above applied) was trained for 300 episodes. Evaluation reward rose from $-41.2$
+(early training, near-random) to a noisy plateau around $-32$ to $-36$ by episode
+300, with Jain fairness rising from $0.54$ to $\approx0.6$--$0.68$ and outage
+falling from $15.1/50$ to $\approx 8$--$10/50$; the remaining episode-to-episode
+noise reflects the randomized initial battery SoC and weather draw per training
+episode, not non-convergence of the policy itself.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{./figures/8_dqn_association_convergence.png}
+\caption{DQN training convergence on the association MDP: evaluation reward, Jain
+fairness, outage, and mean battery SoC vs.\ training episode.}
+\label{fig:dqn-association-convergence}
+\end{figure}
+\FloatBarrier
+
+Table~\ref{tab:phase2-results} extends Section~IV.D's baseline
+(Table~\ref{tab:assoc-baseline-results}) with the trained DQN, and additionally
+reports the reward $R(\mathbf{a})$ defined above for all three policies, since that
+composite metric is first defined in this section.
+
+\begin{table}[t]
+\centering
+\caption{Phase 2 validation: 50 held-out 24-hour episodes (seed 999), 50 users, mean $\pm$ std}
+\label{tab:phase2-results}
+{\scriptsize\setlength{\tabcolsep}{3pt}
+\begin{tabularx}{\columnwidth}{|>{\raggedright\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
+\hline
+\textbf{Policy} & \textbf{Reward $R(\mathbf{a})$} & \textbf{Jain} & \textbf{Outage /50} & \textbf{Throughput [bits/s/Hz]}\\
+\hline
+Random & $-82.2\pm17.0$ & $0.331\pm0.046$ & $33.7\pm3.3$ & $33.95\pm4.75$ \\
+\hline
+Max-SINR (no DRL) & $\mathbf{-19.3\pm17.5}$ & $\mathbf{0.700\pm0.027}$ & $\mathbf{1.0\pm0.9}$ & $\mathbf{76.18\pm3.57}$ \\
+\hline
+DQN & $-34.1\pm13.8$ & $0.607\pm0.045$ & $9.8\pm3.3$ & $66.99\pm5.39$ \\
+\hline
+\end{tabularx}}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{./figures/9_baseline_comparison.png}
+\caption{Random vs.\ max-SINR vs.\ DQN, 50 held-out episodes (error bars: std).}
+\label{fig:baseline-comparison}
+\end{figure}
+\FloatBarrier
+
+\subsubsection{Discussion: DQN vs.\ Plain Mathematical Evaluation}
+
+Both policies comfortably beat random ($4\times$ better reward, $30\times$ lower
+outage). \textbf{The DQN does not yet beat the closed-form max-SINR baseline} on this
+MDP configuration -- it sits clearly between random and max-SINR on every metric.
+Inspecting the learned policy directly (post Error 5/6 fixes) shows it agrees with
+the max-SINR choice for 92\,\% of users; the disagreements are where it does worse,
+not better. This is a genuine, measured result, not a training bug: since users and
+the constellation are both static for the whole episode, the instantaneous best-SINR
+choice is already close to throughput/fairness-optimal for most users most of the
+time, and $P_{k,\text{user}}=1$~W is deliberately small relative to the fixed 700~W
+baseline draw (Section~\ref{sec:assoc-baseline-setup}) -- so the situations where
+trading SINR for battery protection or fairness would actually help are a minority
+the DQN, at this training budget (300 episodes, no hyperparameter search), has not
+reliably learned to detect. In short: for this exact reward and this exact 3-HAPS
+constellation, plain mathematical evaluation (max-SINR) is currently the stronger
+policy, and closing that gap -- more training, a reward or exploration schedule that
+surfaces the rarer battery/fairness trade-off cases more often, or a harder scenario
+mix where max-SINR provably fails -- is future work, not yet a validated Phase~2
+result.
+
+\subsubsection{Phase 3 Scope: Not Yet Implemented}
+
+Two pieces of the wider system design are referenced elsewhere in this document but
+are \textbf{not implemented} in the Phase~2 results above:
+\begin{itemize}\setlength{\itemsep}{0pt}
+  \item \textbf{LSTM weather forecaster}: Section~\ref{subsec:scintillation}'s
+    tropospheric scintillation fading and the LSTM-based forecast of it from
+    rainfall/visibility timeseries (needed for adaptive margin reallocation) are
+    deferred to Phase~3. Phase~2 uses only the static weather features
+    (rain, visibility, hour) already in the state vector.
+  \item \textbf{UAV relay}: the topology's 1 static UAV relay (Table~\ref{tab:config})
+    is geometrically present but its user-facing SINR and the two-hop
+    User$\to$UAV$\to$HAPS path are unmodeled; the DQN action space here is exactly
+    $\{\text{HAPS1},\text{HAPS2},\text{HAPS3}\}$, with $a=3$ (UAV) deferred.
+\end{itemize}
+Both are required before any Phase~3 claim can be validated the same way
+Section~\ref{sec:phase2-results} validates Phase~2.
 
 \section{Abbreviations}
 

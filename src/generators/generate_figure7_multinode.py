@@ -88,8 +88,8 @@ def generate_figure7():
             verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
 
     plt.tight_layout()
-    plt.savefig('output/5_multi_node_sinr.png', dpi=150, bbox_inches='tight')
-    print("Generated: 5_multi_node_sinr.png (Figure 7 - Multi-HAPS interference)")
+    plt.savefig('output/figure7_multi_haps_received_power.png', dpi=150, bbox_inches='tight')
+    print("Generated: figure7_multi_haps_received_power.png (Figure 7 - Multi-HAPS interference)")
     plt.close()
 
 

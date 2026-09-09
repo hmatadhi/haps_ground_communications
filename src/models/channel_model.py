@@ -976,7 +976,7 @@ def make_plots(outdir=None):
             verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
 
     plt.tight_layout()
-    plt.savefig(f"{outdir}/5_multi_node_sinr.png", dpi=150, bbox_inches='tight')
+    plt.savefig(f"{outdir}/figure5_model_received_power.png", dpi=150, bbox_inches='tight')
 
     # --- Plot 6: REMOVED - Signal Power Breakdown (not used in LaTeX; 6a-6d and combined version) ---
 

@@ -61,6 +61,22 @@ class DQNAgent:
             s = torch.as_tensor(state, dtype=torch.float32, device=self.device).unsqueeze(0)
             return int(self.q(s).argmax(dim=1).item())
 
+    def act_batch(self, states):
+        """Epsilon-greedy over a batch of states in one forward pass.
+
+        Equivalent to [self.act(s) for s in states], but avoids one Python-level
+        forward pass per row -- needed when many independent agents (e.g. one
+        per user) share this network and act every step.
+        """
+        states = np.asarray(states, dtype=np.float32)
+        n = states.shape[0]
+        with torch.no_grad():
+            s = torch.as_tensor(states, device=self.device)
+            greedy = self.q(s).argmax(dim=1).cpu().numpy()
+        random_mask = np.random.random(n) < self.eps
+        random_actions = np.random.randint(0, self.n_actions, size=n)
+        return np.where(random_mask, random_actions, greedy)
+
     def remember(self, s, a, r, s2, done):
         self.mem.append((s, a, r, s2, done))
 
