@@ -1,0 +1,159 @@
+\subsection{Core Functions}
+
+The listings below show the core functions realising \eqref{eq:fspl}--\eqref{eq:sinr} and the scintillation fade-depth models.
+
+%\begin{figure}[!htbp]
+\begin{lstlisting}[caption={Core channel-model functions},label={lst:core}]
+import numpy as np
+C = 3e8  # speed of light [m/s]
+
+# (1) HAPS free-space path loss  ->  eq. (1)
+def haps_fspl_db(f_mhz, d_km):
+    return 32.44 + 20*np.log10(f_mhz) + 20*np.log10(d_km)
+
+# (1b) HAPS-to-user/gateway air-to-ground path loss -> eq. (1), Arani et al. Eq. 2
+# Pure free-space path loss: NO landscape/LoS-NLoS term on the HAPS tier
+# (service link 2 GHz AND feeder link 38 GHz both use this -- see S:IV.C).
+def haps_a2g_pathloss_db(r_horiz, h_haps, f_hz, h_user=1.5):
+    dh  = h_haps - h_user
+    d3d = np.sqrt(r_horiz**2 + dh**2)
+    return 20*np.log10(4*np.pi*f_hz*d3d/C)
+
+# (2) UAV LoS probability: exact building-blockage series -> eq. (2)-(3)
+# UAV/relay tier ONLY (300 m altitude) -- building blockage does not apply
+# to the HAPS tier above.
+def los_probability(r, h_uav, h_user=1.5, alpha=0.3, beta=500.0, xi=15.0):
+    dh = h_uav - h_user
+    J  = max(int(np.floor((r/1000.0)*np.sqrt(alpha*beta) - 1.0)), -1)
+    P  = 1.0
+    for n in range(J + 1):
+        frac = (n + 0.5) / (J + 1)
+        val  = h_uav - frac*dh          # h_u - frac*(h_u-h_k)
+        P   *= 1.0 - np.exp(-(val**2) / (2*xi**2))
+    return P
+
+# (3) UAV air-to-ground average path loss  ->  eq. (4)-(5)
+# UAV/relay tier ONLY -- LoS/NLoS blend via Holis & Pechac (2008).
+def uav_a2g_pathloss_db(r, h_uav, f_hz=2e9, h_user=1.5,
+                        eta_los=1.0, eta_nlos=20.0, **env):
+    dh   = h_uav - h_user
+    d3d  = np.sqrt(r**2 + dh**2)
+    plos = los_probability(r, h_uav, h_user, **env)
+    base = 20*np.log10(4*np.pi*f_hz*d3d/C)
+    return plos*(base+eta_los) + (1-plos)*(base+eta_nlos)
+
+# (4) Received power and noise-limited SINR  ->  eq. (6)
+def sinr_db(p_tx_dbm, pl_db, noise_dbm=-100.0):
+    p_rx = 10**((p_tx_dbm - pl_db)/10.0)
+    return 10*np.log10(p_rx / 10**(noise_dbm/10.0))
+\end{lstlisting}
+%\end{figure}
+
+%\begin{figure}[!htbp]
+\begin{lstlisting}[caption={Scintillation fading model (ITU P.618)},label={lst:scint}]
+# Scintillation fade depth (deterministic) -> Equation (12) ITU P.618
+def scintillation_fade_depth_db(p_time_percent, elevation_deg, freq_ghz=20.0):
+    """ITU P.618 fade depth: D = D_ref * (f/f_ref)^0.7
+                                 * (1/sin(elev)) * sqrt(log(1/p))"""
+    elev = np.clip(elevation_deg, 5.0, 90.0)
+    freq_factor = (freq_ghz / 20.0) ** 0.7
+    elev_rad = np.radians(elev)
+    elev_factor = 1.0 / np.sin(elev_rad)
+    p_frac = p_time_percent / 100.0
+    time_factor = np.sqrt(np.abs(np.log(p_frac + 1e-6)))
+    ref_fade_db = 2.5  # at p=1%, elev=30deg, f=20GHz
+    return ref_fade_db * freq_factor * elev_factor * time_factor
+
+# Random fading envelope (log-normal or Gamma)
+def scintillation_fading_envelope(time_samples, p_time_percent, elevation_deg,
+                                   freq_ghz=20.0, dist_km=50.0,
+                                   distribution='log_normal'):
+    """Generate fading multipliers (0-1 linear) matching ITU statistics."""
+    fade_depth_db = scintillation_fade_depth_db(p_time_percent, elevation_deg,
+                                                freq_ghz)
+    fade_depth_linear = 10.0 ** (-fade_depth_db / 20.0)
+    p_in_fade = p_time_percent / 100.0
+    path_variance_scale = np.sqrt(dist_km / 50.0)
+
+    if distribution == 'log_normal':
+        mu = 0.0
+        sigma = np.sqrt(2.0 * np.log(1.0 / fade_depth_linear)) * \
+                path_variance_scale
+        fading_db = np.random.normal(mu, sigma, time_samples)
+        fading_linear = 10.0 ** (fading_db / 20.0)
+    else:  # Gamma
+        shape = 2.0 * path_variance_scale
+        scale = 1.0 / (shape * (1.0 - p_in_fade))
+        fading_linear = np.random.gamma(shape, scale, time_samples)
+
+    return np.clip(fading_linear, fade_depth_linear, 1.0)
+
+# Total feeder link loss including scintillation
+def feeder_link_loss_with_scintillation(distance_km, elevation_deg,
+    freq_ghz=20.0, p_time_percent=1.0, include_scint=True):
+    """L_total = L_FSPL + D(p,theta,f) -> eq. (14)"""
+    fspl_db_val = 20*np.log10(4*np.pi*freq_ghz*1e9*distance_km*1000 / 3e8)
+    if include_scint:
+        fade_depth_db = scintillation_fade_depth_db(p_time_percent,
+                                                    elevation_deg, freq_ghz)
+        return fspl_db_val + fade_depth_db
+    else:
+        return fspl_db_val
+\end{lstlisting}
+%\end{figure}
+
+%\begin{figure}[!htbp]
+\begin{lstlisting}[language=Python,label={lst:atm_api},caption={Atmospheric losses API (atmospheric\_losses.py)}]
+# Import functions
+from atmospheric_losses import (
+    rain_attenuation_db,        # ITU-R P.838 rain model
+    fog_attenuation_db,         # ITU-R P.840 fog model
+    gas_attenuation_db,         # ITU-R P.676 gas absorption
+    scintillation_fading_db,    # ITU-R P.618 scintillation
+    total_feeder_loss_db,       # Combined sum of all effects
+    get_rainfall_rate_for_availability,  # P.837 climatology
+    get_standard_atmosphere,    # Reference atmosphere
+)
+
+# Example: Link budget at 38 GHz, 11.3$^\circ$ elevation
+losses = total_feeder_loss_db(
+    rain_rate_mmhr=10.0,        # Design rain rate [mm/h]
+    liquid_water_g_m3=0.05,     # Fog density [g/m^3]
+    pressure_hpa=1013.0,        # Barometric pressure
+    temp_c=15.0,                # Temperature
+    rh_percent=60.0,            # Relative humidity
+    freq_ghz=38.0,              # Frequency
+    elevation_deg=45.0,         # Elevation angle
+    time_percentage=0.01,       # Outage allowance [%]
+    lat=28.5, lon=77.2          # Location (Delhi)
+)
+
+print(f"Total atmospheric loss: {losses['total']:.2f} dB")
+print(f"  Rain:     {losses['rain']:.2f} dB")
+print(f"  Fog:      {losses['fog']:.2f} dB")
+print(f"  Gas:      {losses['gas']:.2f} dB")
+print(f"  Scint:    {losses['scintillation']:.2f} dB")
+\end{lstlisting}
+%\end{figure}
+
+%\begin{figure}[!htbp]
+\begin{lstlisting}[language=Python,label={lst:climate_api},caption={Climate data API}]
+from atmospheric_losses import (
+    get_rainfall_rate_for_availability,
+    get_rainfall_probability,
+)
+
+# Get rain rate for 99.99% link availability (0.01% outage)
+# This is the "1-in-10000" rain event from 30-year climatology
+rain_99_99pct = get_rainfall_rate_for_availability(
+    lat=28.5, lon=77.2,
+    availability_percent=99.99
+)
+
+# Get probability of rain occurrence
+prob_rain = get_rainfall_probability(lat=28.5, lon=77.2)
+
+print(f"Design rain rate: {rain_99_99pct:.1f} mm/h (0.01% exceedance)")
+print(f"Rain probability: {prob_rain:.1f}% of average year")
+\end{lstlisting}
+%\end{figure}
