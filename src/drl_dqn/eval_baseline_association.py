@@ -136,18 +136,18 @@ def main():
         for name, r in results.items():
             writer.writerow({"policy": name, **r})
 
-    fig, ax = plt.subplots(1, 4, figsize=(18, 3.5))
+    fig, ax = plt.subplots(2, 2, figsize=(7, 6))
     names = list(results.keys())
     colors = ["tab:gray", "tab:orange", "tab:blue"]
 
     metrics = [("reward", "Eval reward / hour"), ("jain", "Jain fairness"),
                ("outage", f"Outage (of {N_USERS} users)"), ("soc", "Mean battery SoC (%)")]
-    for i, (key, title) in enumerate(metrics):
+    for (key, title), axis in zip(metrics, ax.flat):
         means = [results[n][f"{key}_mean"] for n in names]
         stds = [results[n][f"{key}_std"] for n in names]
-        ax[i].bar(names, means, yerr=stds, color=colors, capsize=4)
-        ax[i].set_title(title)
-        ax[i].grid(alpha=0.3, axis="y")
+        axis.bar(names, means, yerr=stds, color=colors, capsize=4)
+        axis.set_title(title)
+        axis.grid(alpha=0.3, axis="y")
     fig.tight_layout()
     os.makedirs(os.path.join(RESULTS_DIR, "figures"), exist_ok=True)
     fig.savefig(os.path.join(RESULTS_DIR, "figures", "9_baseline_comparison.png"), dpi=150)
