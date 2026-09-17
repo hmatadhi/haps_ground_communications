@@ -35,7 +35,7 @@ import torch
 import matplotlib.pyplot as plt
 
 from dqn_agent import DQNAgent
-from haps_association_env import HAPSAssociationEnv
+from haps_association_env import HAPSAssociationEnv, SINR_DB_MIN, SINR_DB_MAX, CAPACITY_BPS_HZ_MAX
 from weather_scenario_generator import WeatherScenarioGenerator
 
 N_USERS = 50
@@ -56,10 +56,17 @@ def make_env(seed):
 
 
 def max_sinr_policy(state, env):
-    # state columns 0:3 are normalised SINR to HAPS 0,1,2 -- argmax is
-    # monotonic under the shared linear normalisation, so this is exactly
-    # argmax_p SINR_k,p in dB, without re-deriving it from raw physics.
-    return np.argmax(state[:, 0:3], axis=1)
+    # Extended "naive" baseline: pick whichever of the 6 actions (direct to
+    # HAPS 0-2, or relay via HAPS 0-2's Gateway) gives the highest Shannon
+    # capacity. Direct capacity is derived from state columns 0:3 (normalised
+    # SINR, denormalised back to dB); relay capacity is state columns 12:15
+    # (normalised bps/Hz), both denormalised with haps_association_env's own
+    # bounds so this stays consistent with however the env normalises them.
+    sinr_db = state[:, 0:3] * (SINR_DB_MAX - SINR_DB_MIN) + SINR_DB_MIN
+    direct_capacity = np.log2(1.0 + 10.0 ** (sinr_db / 10.0))
+    relay_capacity = state[:, 12:15] * CAPACITY_BPS_HZ_MAX
+    combined_capacity = np.concatenate([direct_capacity, relay_capacity], axis=1)  # (n_users, 6)
+    return np.argmax(combined_capacity, axis=1)
 
 
 def random_policy(state, env):

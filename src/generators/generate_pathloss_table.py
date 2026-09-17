@@ -18,16 +18,13 @@ sys.path.insert(0, os.path.dirname(__file__) + '/..')  # Add parent dir to path
 
 import numpy as np
 import pandas as pd
-from models.channel_model import haps_a2g_pathloss_db, HAPS_ALT_M
+from models.channel_model import haps_a2g_pathloss_db, HAPS_ALT_M, GATEWAY_ALT_M
 
 # Create output directories
 os.makedirs('appendix_data', exist_ok=True)
 os.makedirs('appendix_tables', exist_ok=True)
 
 USER_ALT_M = 1.5            # 2 GHz service link: user altitude [m]
-GATEWAY_ALT_M = 50.0        # 38 GHz feeder link: gateway altitude [m] AGL
-                             # (matches export_feeder_link_csv() convention and
-                             # this document's stated Gateway height, S:III.A)
 FREQ_SERVICE_HZ = 2.0e9     # Service link: 2 GHz
 FREQ_FEEDER_HZ = 38.0e9     # Feeder link: 38 GHz
 

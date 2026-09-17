@@ -6,15 +6,19 @@ paper's "Phase 2: DRL for User Association" section (HAPS_AI_HW_ChannelModel.tex
 
   * 3 HAPS nodes, fixed, equilateral-triangle constellation (65 km spacing),
     geometry from channel_model.haps_constellation_geometry().
-  * N ground users, static for the episode, each independently picks which
-    HAPS to associate with each hour: action in {0, 1, 2}.
-  * Per-user state (12-dim): SINR to each of the 3 HAPS (dB), horizontal
+  * N ground users, static for the episode, each independently picks each
+    hour how to be served: directly by one of the 3 HAPS (action 0-2), or
+    via a decode-and-forward relay through that HAPS's Gateway (action 3-5),
+    i.e. action in {0, ..., 5} = 2 * n_haps.
+  * Per-user state (15-dim): SINR to each of the 3 HAPS (dB), horizontal
     distance to each (km), each HAPS's battery SoC (%), rain rate, visibility,
-    hour of day.
+    hour of day, and relay capacity via each HAPS's Gateway (bps/Hz,
+    normalized) -- see relay design note below.
   * Reward: the paper's exact eq. (Phase 2, Reward Function) --
     0.5*L_agg + 0.3*Jain - 0.2*P_eng + severe/degraded/low-battery penalties,
-    computed once per step on the SINR each user actually gets from its
-    chosen HAPS, then de-rated for rain-degraded feeder (backhaul) capacity.
+    computed once per step on the SINR (or SINR-equivalent, for relay users)
+    each user actually gets from its chosen path, then de-rated for
+    rain-degraded feeder (backhaul) capacity.
     L_agg and Jain reuse reward_function.py's linear-SINR helpers (tested);
     the outage penalties are implemented here as the paper's own two-tier
     *fractional* penalty (-100 x fraction severe, -20 x fraction degraded),
@@ -25,11 +29,21 @@ paper's "Phase 2: DRL for User Association" section (HAPS_AI_HW_ChannelModel.tex
     moves the aggregate reward, so the network never learns to discriminate
     between users.
   * Battery: battery_model.HAPSBatteryModel, updated once per simulated hour
-    per HAPS from the aggregate load of its currently-associated users.
+    per HAPS from the aggregate load of its currently-associated users
+    (direct or relay -- both draw from the serving HAPS's battery).
 
-The 1 static UAV relay from the paper's topology is not modeled here: the
-paper explicitly defers its SINR/association to "Phase 2 v2" (action a=3
-"deferred"), so the action space here is exactly {HAPS1, HAPS2, HAPS3}.
+Relay design (HAPS -> Gateway -> UE): each HAPS has one Gateway, colocated at
+its ground nadir point (matching the short feeder-distance convention used in
+src/generators/generate_pathloss_table.py and generate_relay_table.py), so the
+existing per-user/per-HAPS horizontal distance is reused directly as the
+Gateway->UE access-hop distance. End-to-end relay capacity is
+decode-and-forward, C_relay = min(C_feeder, C_access), via
+channel_model.relay_two_hop_capacity_bps_hz(). This is a *different* concept
+from the paper's 1 static UAV relay (User -> UAV -> HAPS), which remains
+unmodeled here: the paper explicitly defers that one's SINR/association to
+"Phase 2 v2" (its own action a=3 "deferred"). The Gateway relay added here is
+a routing decision through an existing network node, not the paper's
+unmodeled UAV tier.
 
 Unlike haps_env.py (a different, unrelated 1-HAPS/3-mobile-UAV MDP), users
 and HAPS are both static within an episode, so each user's raw SINR to each
@@ -60,6 +74,15 @@ SINR_DB_MIN, SINR_DB_MAX = -20.0, 30.0
 DIST_KM_MAX = 100.0
 RAIN_MM_H_MAX = 50.0
 VIS_M_MAX = 10_000.0
+CAPACITY_BPS_HZ_MAX = 20.0  # normalisation bound for relay capacity features
+
+# Fixed feeder-hop geometry for the Gateway relay path: the Gateway is
+# colocated near each HAPS's ground nadir point, matching the short
+# feeder-distance convention in generate_pathloss_table.py /
+# generate_relay_table.py, so elevation is close to 90 deg regardless of the
+# (short) horizontal offset.
+RELAY_FEEDER_DIST_KM = 0.1
+RELAY_FEEDER_ELEVATION_DEG = 89.0
 
 
 class HAPSAssociationEnv:
@@ -92,8 +115,8 @@ class HAPSAssociationEnv:
         self.rng = np.random.default_rng(seed)
 
         self.n_haps = 3
-        self.n_actions = 3
-        self.state_dim = 3 + 3 + 3 + 3  # SINR + dist + SoC + (rain, vis, hour)
+        self.n_actions = 2 * self.n_haps  # direct {0,1,2} + relay-via-Gateway {3,4,5}
+        self.state_dim = 3 + 3 + 3 + 3 + 3  # SINR + dist + SoC + (rain, vis, hour) + relay capacity
 
         self.battery_model = HAPSBatteryModel(battery_capacity_wh=12_000.0)  # paper's C_battery (eq. battery-balance)
 
@@ -107,6 +130,7 @@ class HAPSAssociationEnv:
         self.user_xy_m = None
         self._sinr_db = None   # (n_users, 3), cached per episode (static geometry)
         self._dist_km = None   # (n_users, 3)
+        self._relay_capacity = None  # (n_users, 3) bps/Hz, cached per episode
 
     # ------------------------------------------------------------------
     def _init_weather(self):
@@ -143,6 +167,16 @@ class HAPSAssociationEnv:
         self._sinr_db = sinr_db
         self._dist_km = dist_m / 1000.0
 
+        relay_capacity = np.zeros((self.n_users, self.n_haps))
+        for p in range(self.n_haps):
+            relay = cm.relay_two_hop_capacity_bps_hz(
+                feeder_dist_km=RELAY_FEEDER_DIST_KM,
+                feeder_elevation_deg=RELAY_FEEDER_ELEVATION_DEG,
+                gw_ue_dist_m=dist_m[:, p],
+            )
+            relay_capacity[:, p] = relay["capacity_relay_bps_hz"]
+        self._relay_capacity = relay_capacity
+
     # ------------------------------------------------------------------
     def reset(self):
         self.t = 0
@@ -164,15 +198,28 @@ class HAPSAssociationEnv:
         s[:, 9] = np.clip(rain / RAIN_MM_H_MAX, 0.0, 1.0)
         s[:, 10] = np.clip(vis_m / VIS_M_MAX, 0.0, 1.0)
         s[:, 11] = self.hour_of_day / 24.0
+        s[:, 12:15] = np.clip(self._relay_capacity / CAPACITY_BPS_HZ_MAX, 0.0, 1.0)
         return s
 
     # ------------------------------------------------------------------
     def step(self, actions):
-        """actions: array of length n_users, each in {0, 1, 2}."""
+        """actions: array of length n_users, each in {0, ..., n_actions-1}.
+        Actions 0..n_haps-1 = direct association with that HAPS; actions
+        n_haps..2*n_haps-1 = relay via that HAPS's Gateway."""
         actions = np.asarray(actions, dtype=int)
-        chosen_sinr_db = self._sinr_db[np.arange(self.n_users), actions]
+        is_relay = actions >= self.n_haps
+        serving_haps = actions % self.n_haps  # both direct and relay load the same HAPS's battery
+        user_idx = np.arange(self.n_users)
 
-        counts = np.bincount(actions, minlength=self.n_haps).astype(float)
+        # Direct users get their raw SINR; relay users get an SINR-equivalent
+        # derived from the DF relay capacity, so both share one array for the
+        # downstream throughput/Jain-fairness computations.
+        direct_sinr_db = self._sinr_db[user_idx, serving_haps]
+        relay_capacity = self._relay_capacity[user_idx, serving_haps]
+        relay_sinr_db = 10.0 * np.log10(np.maximum(2.0 ** relay_capacity - 1.0, 1e-15))
+        chosen_sinr_db = np.where(is_relay, relay_sinr_db, direct_sinr_db)
+
+        counts = np.bincount(serving_haps, minlength=self.n_haps).astype(float)
         user_load_w = counts * self.p_per_user_w
 
         new_soc = np.zeros(self.n_haps)
@@ -232,6 +279,7 @@ class HAPSAssociationEnv:
             "battery_soc": self.soc.copy(),
             "assoc_counts": counts,
             "feeder_capacity_fraction": capacity_fraction,
+            "n_relay": int(np.sum(is_relay)),
         }
         return self._states(), rewards, done, info
 
@@ -251,5 +299,5 @@ if __name__ == "__main__":
         if hour % 6 == 0:
             print(f"hour {hour:2d} | reward={r.mean():7.2f} | jain={info['jain_index']:.3f} | "
                   f"outage={info['n_outage']:2d} | soc={np.round(info['battery_soc'], 1)} | "
-                  f"feeder_frac={info['feeder_capacity_fraction']:.2f}")
+                  f"feeder_frac={info['feeder_capacity_fraction']:.2f} | n_relay={info['n_relay']}")
     print("done" if done else "not done (unexpected)")

@@ -67,6 +67,11 @@ NOTE ON FIDELITY
   serving tiers -- no cascaded relay gain in their SINR equations. No other
   source reviewed for this project models UAV relay amplification either.
   This is a known gap, deferred to Phase 2, not silently assumed away.
+* MODELED: a separate two-hop HAPS -> Gateway -> UE relay path (decode-
+  and-forward), see relay_two_hop_capacity_bps_hz(). This is NOT the same
+  concept as the still-unmodeled User -> UAV -> HAPS relay above -- it
+  routes a UE through the Gateway (feeder-link endpoint) instead of being
+  served directly by the HAPS.
 """
 
 import os
@@ -83,12 +88,20 @@ C = 3e8  # speed of light [m/s]
 # ----------------------------------------------------------------------
 AREA_M = 1000.0          # 1000 x 1000 m service area                 (paper V)
 HAPS_ALT_M = 20_000.0    # HAPS altitude: 20 km at area center        (paper V)
+GATEWAY_ALT_M = 50.0     # Gateway altitude [m] AGL (matches export_feeder_link_csv()
+                         # / generate_pathloss_table.py convention and this
+                         # document's stated Gateway height, Sec III.A)
 F_HAPS_MHZ = 2000.0      # HAPS carrier ~2 GHz  (VERIFY vs Table 1)
 F_UAV_HZ = 2.0e9         # UAV carrier ~2 GHz   (VERIFY vs Table 1)
 
 # Transmit powers / noise (Arani, Hu & Zhu 2023, Table 1)
 P_TX_UAV_DBM = 24.0      # UAV transmit power [dBm] (Table 1)
 P_TX_HAPS_DBM = 43.0     # HAPS transmit power [dBm] (Table 1)
+P_TX_GATEWAY_DBM = P_TX_HAPS_DBM  # Gateway->UE relay hop: ASSUMED to reuse the
+                         # same 2 GHz service band and transmit-power convention
+                         # as the HAPS->UE link (no separate Gateway RF budget
+                         # is specified anywhere in the source material) -- see
+                         # relay_two_hop_capacity_bps_hz() docstring.
 NOISE_DBM = -100.0       # thermal noise power over the channel [dBm]
 
 # Air-to-ground environment presets -- UAV/relay tier only (uav_a2g_pathloss_db,
@@ -535,6 +548,71 @@ def feeder_link_loss_with_scintillation(distance_km, elevation_deg, freq_ghz=20.
         return fspl_db_val + fade_depth_db
     else:
         return fspl_db_val
+
+
+def relay_two_hop_capacity_bps_hz(feeder_dist_km, feeder_elevation_deg, gw_ue_dist_m,
+                                   p_tx_gw_dbm=P_TX_GATEWAY_DBM, f_gw_ue_hz=F_HAPS_MHZ * 1e6,
+                                   h_gateway_m=GATEWAY_ALT_M, h_user_m=1.5,
+                                   p_time_percent=1.0, include_scint=True,
+                                   noise_dbm=NOISE_DBM):
+    """
+    End-to-end decode-and-forward (DF) capacity for the HAPS -> Gateway ->
+    UE relay path.
+
+    Hop 1 (feeder, HAPS -> Gateway, 38 GHz K/Ka-band): reuses
+    feeder_link_loss_with_scintillation(), the existing feeder-link model.
+    Hop 2 (access, Gateway -> UE): reuses haps_a2g_pathloss_db(), the same
+    function used for the direct HAPS->UE service link, called with the
+    Gateway's altitude instead of the HAPS's -- ASSUMED to reuse the same
+    2 GHz service band and transmit-power convention as the HAPS->UE link
+    (no separate Gateway downlink RF budget exists in the source material).
+
+    Since the Gateway is a real network node (not a bent-pipe repeater like
+    the HAPS-feeder assumption), the two hops are combined as
+    decode-and-forward: the end-to-end rate is the bottleneck of the two
+    hops, C_relay = min(C_feeder, C_access). Reusing the same band on both
+    the service and Gateway->UE hops implies an (unmodeled) orthogonal
+    resource-allocation assumption between the two -- no self-interference
+    between hops is modeled here, consistent with how other simplifications
+    are flagged elsewhere in this file (e.g. `env` unused in
+    haps_a2g_pathloss_db()).
+
+    Args:
+        feeder_dist_km: HAPS-Gateway slant distance [km]
+        feeder_elevation_deg: elevation angle of Gateway w.r.t. HAPS [deg]
+        gw_ue_dist_m: horizontal Gateway-UE distance [m]
+        p_tx_gw_dbm: Gateway transmit power for the access hop [dBm]
+        f_gw_ue_hz: Gateway->UE carrier frequency [Hz]
+        h_gateway_m: Gateway altitude [m]
+        h_user_m: UE altitude [m]
+        p_time_percent: scintillation time percentage (feeder hop only)
+        include_scint: include scintillation fading on the feeder hop
+        noise_dbm: thermal noise power [dBm]
+
+    Returns:
+        dict with sinr_feeder_db, sinr_access_db, capacity_feeder_bps_hz,
+        capacity_access_bps_hz, capacity_relay_bps_hz (the DF bottleneck).
+    """
+    feeder_loss_db = feeder_link_loss_with_scintillation(
+        feeder_dist_km, feeder_elevation_deg, p_time_percent=p_time_percent,
+        include_scint=include_scint,
+    )
+    sinr_feeder_db = sinr_db(rx_power_dbm(P_TX_HAPS_DBM, feeder_loss_db), noise_dbm=noise_dbm)
+    capacity_feeder = np.log2(1.0 + 10.0 ** (np.asarray(sinr_feeder_db) / 10.0))
+
+    access_loss_db = haps_a2g_pathloss_db(gw_ue_dist_m, h_gateway_m, f_hz=f_gw_ue_hz, h_user_m=h_user_m)
+    sinr_access_db = sinr_db(rx_power_dbm(p_tx_gw_dbm, access_loss_db), noise_dbm=noise_dbm)
+    capacity_access = np.log2(1.0 + 10.0 ** (np.asarray(sinr_access_db) / 10.0))
+
+    capacity_relay = np.minimum(capacity_feeder, capacity_access)
+
+    return {
+        "sinr_feeder_db": sinr_feeder_db,
+        "sinr_access_db": sinr_access_db,
+        "capacity_feeder_bps_hz": capacity_feeder,
+        "capacity_access_bps_hz": capacity_access,
+        "capacity_relay_bps_hz": capacity_relay,
+    }
 
 
 def multi_node_sinr_db(r_horiz_m, num_haps=3, p_tx_dbm=P_TX_HAPS_DBM,
