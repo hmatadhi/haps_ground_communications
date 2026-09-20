@@ -62,16 +62,21 @@ NOTE ON FIDELITY
   path-loss exponent, chi as shadowing sigma) for their one simulated
   environment (suburban) -- see ENVIRONMENTS comment below for the numbers.
   Not yet adopted; current eta_los/eta_nlos values remain flat dB offsets.
-* NOT MODELED: a two-hop User -> UAV -> HAPS relay/amplification SINR chain.
+* NOT MODELED: a two-hop User -> UAV -> HAPS relay/amplification SINR chain
+  (i.e. UAV as a signal amplifier/repeater within a single SINR equation).
   Paper 1 (Arani et al.) treats UAVs and HAPS as parallel, independent
   serving tiers -- no cascaded relay gain in their SINR equations. No other
   source reviewed for this project models UAV relay amplification either.
-  This is a known gap, deferred to Phase 2, not silently assumed away.
-* MODELED: a separate two-hop HAPS -> Gateway -> UE relay path (decode-
-  and-forward), see relay_two_hop_capacity_bps_hz(). This is NOT the same
-  concept as the still-unmodeled User -> UAV -> HAPS relay above -- it
-  routes a UE through the Gateway (feeder-link endpoint) instead of being
-  served directly by the HAPS.
+  This is a known gap, not silently assumed away.
+* MODELED: two separate two-hop decode-and-forward relay paths, each an
+  alternative route from the serving HAPS to a UE (not a cascaded gain
+  within one SINR equation):
+    - HAPS -> Gateway -> UE, see relay_two_hop_capacity_bps_hz(). Routes a
+      UE through the Gateway (feeder-link endpoint) instead of being served
+      directly by the HAPS.
+    - HAPS -> UAV -> UE, see uav_relay_two_hop_capacity_bps_hz(). Routes a
+      UE through a relaying UAV: a 38 GHz feeder-style HAPS->UAV hop
+      followed by a 2 GHz, landscape-dependent UAV->UE access hop.
 """
 
 import os
@@ -93,6 +98,11 @@ GATEWAY_ALT_M = 50.0     # Gateway altitude [m] AGL (matches export_feeder_link_
                          # document's stated Gateway height, Sec III.A)
 F_HAPS_MHZ = 2000.0      # HAPS carrier ~2 GHz  (VERIFY vs Table 1)
 F_UAV_HZ = 2.0e9         # UAV carrier ~2 GHz   (VERIFY vs Table 1)
+UAV_ALT_M = 500.0        # UAV relay hover altitude [m] (HAPS->UAV->UE relay tier),
+                         # matches generate_pathloss_table.py's UAV_ALT_M convention
+UAV_RELAY_HOVER_HORIZ_M = 50.0  # UAV's horizontal hover offset from the UE it
+                         # relays for, on the UAV->UE access hop (ASSUMED small
+                         # since the UAV is deployed to serve that specific UE)
 
 # Transmit powers / noise (Arani, Hu & Zhu 2023, Table 1)
 P_TX_UAV_DBM = 24.0      # UAV transmit power [dBm] (Table 1)
@@ -103,6 +113,37 @@ P_TX_GATEWAY_DBM = P_TX_HAPS_DBM  # Gateway->UE relay hop: ASSUMED to reuse the
                          # is specified anywhere in the source material) -- see
                          # relay_two_hop_capacity_bps_hz() docstring.
 NOISE_DBM = -100.0       # thermal noise power over the channel [dBm]
+
+# 38 GHz feeder-style link antenna gains (HAPS<->Gateway, HAPS<->UAV). This
+# project's SINR formulas (Sec. III, gamma_{h,g}/gamma_{h,u}) already include
+# transmit/receive antenna-gain terms G_h, G_g, G_u, but earlier revisions of
+# feeder_link_loss_with_scintillation()/rx_power_dbm() omitted them, i.e. only
+# P_TX_HAPS_DBM against raw FSPL+scintillation loss was used. That collapses
+# every 38 GHz feeder-style hop to a deeply negative SINR at any distance,
+# which is not how point-to-point Ka-band links are engineered in practice --
+# they are closed with directional antennas, not raw transmit power. Values
+# below are literature-typical for 30 GHz-class HAPS backhaul (this project's
+# 38 GHz is close enough in wavelength that the same aperture gains apply):
+G_TX_HAPS_FEEDER_DBI = 13.8  # HAPS-side transmit antenna gain for 38 GHz
+                         # feeder-style links (toward Gateway or UAV), per the
+                         # Ka-band (30 GHz) link budget in Karaman et al.,
+                         # "On-Demand HAPS-Assisted Communication System for
+                         # Public Safety," IEEE Commun. Mag., 2025
+                         # (arXiv:2507.09153), Table I: Tx power 43.2 dBm
+                         # (matches P_TX_HAPS_DBM here almost exactly), Tx
+                         # antenna gain 13.8 dBi.
+G_RX_GATEWAY_FEEDER_DBI = 39.7  # Ground Gateway receive antenna gain (VSAT
+                         # terminal, fixed installation so a larger aperture
+                         # is feasible than on an airborne UAV), per the same
+                         # source (Karaman et al. 2025, Table I: Rx antenna
+                         # gain 39.7 dBi).
+G_RX_UAV_FEEDER_DBI = 30.7  # UAV-side receive antenna gain for the HAPS->UAV
+                         # hop: a UAV-mountable 32x32 mmWave patch array
+                         # achieves 30.7-32.8 dBi at 25.4-26.9 GHz (Anim, Lee
+                         # & Jung, "High-Gain Millimeter-Wave Patch Array
+                         # Antenna for Unmanned Aerial Vehicle Application,"
+                         # Sensors, 21(11):3914, 2021); the conservative low
+                         # end of that range is used here at 38 GHz.
 
 # Air-to-ground environment presets -- UAV/relay tier only (uav_a2g_pathloss_db,
 # los_probability). The HAPS tier (haps_a2g_pathloss_db) uses pure FSPL with no
@@ -510,8 +551,8 @@ def scintillation_fading_envelope(time_samples, p_time_percent, elevation_deg,
 # ----------------------------------------------------------------------
 # 4. Received power and SINR with multi-node interference
 # ----------------------------------------------------------------------
-def rx_power_dbm(p_tx_dbm, pathloss_db):
-    return p_tx_dbm - pathloss_db
+def rx_power_dbm(p_tx_dbm, pathloss_db, g_tx_dbi=0.0, g_rx_dbi=0.0):
+    return p_tx_dbm + g_tx_dbi + g_rx_dbi - pathloss_db
 
 
 def sinr_db(p_rx_dbm, interference_dbm=None, noise_dbm=NOISE_DBM):
@@ -597,7 +638,9 @@ def relay_two_hop_capacity_bps_hz(feeder_dist_km, feeder_elevation_deg, gw_ue_di
         feeder_dist_km, feeder_elevation_deg, p_time_percent=p_time_percent,
         include_scint=include_scint,
     )
-    sinr_feeder_db = sinr_db(rx_power_dbm(P_TX_HAPS_DBM, feeder_loss_db), noise_dbm=noise_dbm)
+    sinr_feeder_db = sinr_db(rx_power_dbm(P_TX_HAPS_DBM, feeder_loss_db,
+                                           g_tx_dbi=G_TX_HAPS_FEEDER_DBI,
+                                           g_rx_dbi=G_RX_GATEWAY_FEEDER_DBI), noise_dbm=noise_dbm)
     capacity_feeder = np.log2(1.0 + 10.0 ** (np.asarray(sinr_feeder_db) / 10.0))
 
     access_loss_db = haps_a2g_pathloss_db(gw_ue_dist_m, h_gateway_m, f_hz=f_gw_ue_hz, h_user_m=h_user_m)
@@ -612,6 +655,80 @@ def relay_two_hop_capacity_bps_hz(feeder_dist_km, feeder_elevation_deg, gw_ue_di
         "capacity_feeder_bps_hz": capacity_feeder,
         "capacity_access_bps_hz": capacity_access,
         "capacity_relay_bps_hz": capacity_relay,
+    }
+
+
+def uav_relay_two_hop_capacity_bps_hz(r_horiz_m, h_uav_m=UAV_ALT_M, h_haps_m=HAPS_ALT_M,
+                                       env="urban", uav_ue_horiz_m=UAV_RELAY_HOVER_HORIZ_M,
+                                       p_tx_uav_dbm=P_TX_UAV_DBM, f_uav_ue_hz=F_UAV_HZ,
+                                       h_user_m=1.5, p_time_percent=1.0, include_scint=True,
+                                       noise_dbm=NOISE_DBM):
+    """
+    End-to-end decode-and-forward (DF) capacity for the HAPS -> UAV -> UE
+    relay path.
+
+    Hop 1 (HAPS -> UAV, 38 GHz K/Ka-band): the UAV is treated as hovering at
+    horizontal distance r_horiz_m from the serving HAPS nadir -- i.e. roughly
+    above the UE it is relaying for, matching the sweep convention used in
+    generate_pathloss_table.py's "Relay (HAPS->UAV)" rows. This hop reuses
+    the same feeder-style slant-range + ITU-P.618 scintillation model as the
+    HAPS->Gateway feeder hop (feeder_link_loss_with_scintillation()), since
+    both are high-altitude, high-frequency backhaul-style links.
+
+    Hop 2 (UAV -> UE, 2 GHz): the UAV is a low-altitude access node subject
+    to building blockage, so this hop reuses uav_a2g_pathloss_db() -- the
+    landscape-dependent LoS/NLoS blended model -- rather than the pure-FSPL
+    model used for the Gateway->UE access hop, with a small fixed hover
+    offset (uav_ue_horiz_m) standing in for the UAV's horizontal distance
+    from the UE it serves.
+
+    As with the Gateway relay, the two hops are combined decode-and-forward:
+    C_relay = min(C_haps_uav, C_uav_ue).
+
+    Args:
+        r_horiz_m: horizontal distance from the serving HAPS nadir to the
+            UAV (== to the UE it is relaying for) [m]
+        h_uav_m: UAV hover altitude [m]
+        h_haps_m: HAPS altitude [m]
+        env: landscape environment for the UAV->UE access hop
+        uav_ue_horiz_m: UAV's horizontal hover offset from the UE [m]
+        p_tx_uav_dbm: UAV transmit power for the access hop [dBm]
+        f_uav_ue_hz: UAV->UE carrier frequency [Hz]
+        h_user_m: UE altitude [m]
+        p_time_percent: scintillation time percentage (HAPS->UAV hop only)
+        include_scint: include scintillation fading on the HAPS->UAV hop
+        noise_dbm: thermal noise power [dBm]
+
+    Returns:
+        dict with sinr_haps_uav_db, sinr_uav_ue_db, capacity_haps_uav_bps_hz,
+        capacity_uav_ue_bps_hz, capacity_uav_relay_bps_hz (the DF bottleneck).
+    """
+    r_horiz_m = np.asarray(r_horiz_m, dtype=float)
+    dh_m = h_haps_m - h_uav_m
+    slant_km = np.sqrt(r_horiz_m ** 2 + dh_m ** 2) / 1000.0
+    elevation_deg = np.degrees(np.arctan2(dh_m, r_horiz_m))
+
+    haps_uav_loss_db = feeder_link_loss_with_scintillation(
+        slant_km, elevation_deg, freq_ghz=38.0, p_time_percent=p_time_percent,
+        include_scint=include_scint,
+    )
+    sinr_haps_uav_db = sinr_db(rx_power_dbm(P_TX_HAPS_DBM, haps_uav_loss_db,
+                                             g_tx_dbi=G_TX_HAPS_FEEDER_DBI,
+                                             g_rx_dbi=G_RX_UAV_FEEDER_DBI), noise_dbm=noise_dbm)
+    capacity_haps_uav = np.log2(1.0 + 10.0 ** (np.asarray(sinr_haps_uav_db) / 10.0))
+
+    uav_ue_loss_db = uav_a2g_pathloss_db(uav_ue_horiz_m, h_uav_m, f_hz=f_uav_ue_hz, env=env, h_user_m=h_user_m)
+    sinr_uav_ue_db = sinr_db(rx_power_dbm(p_tx_uav_dbm, uav_ue_loss_db), noise_dbm=noise_dbm)
+    capacity_uav_ue = np.log2(1.0 + 10.0 ** (np.asarray(sinr_uav_ue_db) / 10.0))
+
+    capacity_relay = np.minimum(capacity_haps_uav, capacity_uav_ue)
+
+    return {
+        "sinr_haps_uav_db": sinr_haps_uav_db,
+        "sinr_uav_ue_db": sinr_uav_ue_db,
+        "capacity_haps_uav_bps_hz": capacity_haps_uav,
+        "capacity_uav_ue_bps_hz": capacity_uav_ue,
+        "capacity_uav_relay_bps_hz": capacity_relay,
     }
 
 
@@ -963,13 +1080,105 @@ def export_haps_sinr_generic(output_file, freq_mhz=2000.0, distances_m=None,
     return df
 
 
-def export_feeder_link_csv(output_file="haps_feeder_link_38ghz.csv", distances_m=None):
-    """Export 38 GHz feeder link (HAPS-to-Gateway) SINR data."""
+def export_feeder_link_csv(output_file="haps_feeder_link_38ghz.csv", distances_m=None,
+                           h_gateway_m=GATEWAY_ALT_M, h_haps_m=HAPS_ALT_M,
+                           p_tx_dbm=P_TX_HAPS_DBM, noise_dbm=NOISE_DBM,
+                           constellation_spacing_km=65.0, p_time_percent=1.0,
+                           include_scint=True):
+    """
+    Export 38 GHz feeder link (HAPS-to-Gateway) SINR data, gain- and
+    scintillation-aware, in the same column shape as export_haps_sinr_generic()
+    (Landscape, Distance_m, SINR_Single, SINR_Interferers, SINR_Actual, ...)
+    so it is a drop-in source for sinr_plot.py's trellis chart.
+
+    Unlike export_haps_sinr_generic() (which is written for the 2 GHz service
+    link and just does p_tx - FSPL with no gains), this reuses the exact
+    feeder-hop math already used by relay_two_hop_capacity_bps_hz() /
+    uav_relay_two_hop_capacity_bps_hz(): near-zenith slant range + ITU-P.618
+    scintillation via feeder_link_loss_with_scintillation(), then
+    rx_power_dbm() with the 38 GHz feeder antenna gains G_TX_HAPS_FEEDER_DBI /
+    G_RX_GATEWAY_FEEDER_DBI (see their module-level docstrings for sourcing).
+
+    Geometry: the Gateway sits (near-)beneath the serving HAPS, so
+    distances_m (default 10-500 m) is its small horizontal offset from HAPS
+    nadir, not a slant range -- matching the existing 10-500 m sweep
+    documented in HAPS_AI_HW_ChannelModel.tex Sec. II ("~19.95 km slant,
+    elevation ~89.86 deg" at the 50 m Gateway altitude).
+
+    The HAPS->Gateway hop is pure FSPL (see haps_a2g_pathloss_db()'s
+    docstring / Arani et al. Eq. 2), so it is landscape-independent; `env`
+    is only used to label rows so the CSV can drive the same 4-landscape
+    trellis chart as the service-link figure, per HAPS_AI_HW_ChannelModel.tex
+    ("four identical landscape subplots").
+
+    Interference (SINR_Interferers): the 2 interfering HAPS sit ~65-68 km
+    away (equilateral 3-HAPS constellation, haps_horiz_ranges_to_user()) at
+    a correspondingly low elevation angle from this Gateway. Their signal is
+    computed WITHOUT the Gateway's high-gain feeder antenna gain (g_rx=0.0)
+    and without the interfering HAPS's own feeder transmit gain (g_tx=0.0):
+    both antennas are boresight-pointed at their own intended endpoint, so
+    an off-axis interferer/receiver only sees sidelobe-level gain, not the
+    ~53.5 dBi combined boresight gain used for the wanted link. This mirrors
+    the paper's stated conclusion that the feeder link is noise-limited, not
+    interference-limited, under this geometry (see Sec. IV discussion).
+    """
     if distances_m is None:
         distances_m = [10, 50, 100, 500]
 
-    return export_haps_sinr_generic(output_file, freq_mhz=38000.0, distances_m=distances_m,
-                                    h_user_m=50.0, noise_dbm=NOISE_DBM)
+    dh_m = h_haps_m - h_gateway_m
+    noise_lin = 10.0 ** (noise_dbm / 10.0)
+    landscapes = list(ENVIRONMENTS.keys())
+    results = []
+
+    for landscape in landscapes:
+        for d_m in distances_m:
+            slant_km = float(np.sqrt(d_m ** 2 + dh_m ** 2) / 1000.0)
+            elevation_deg = float(np.degrees(np.arctan2(dh_m, d_m)))
+
+            loss_db = feeder_link_loss_with_scintillation(
+                slant_km, elevation_deg, freq_ghz=38.0,
+                p_time_percent=p_time_percent, include_scint=include_scint)
+            p_serving_dbm = float(np.asarray(rx_power_dbm(
+                p_tx_dbm, loss_db,
+                g_tx_dbi=G_TX_HAPS_FEEDER_DBI,
+                g_rx_dbi=G_RX_GATEWAY_FEEDER_DBI)).flat[0])
+            p_serving_lin = 10.0 ** (p_serving_dbm / 10.0)
+
+            sinr_single = 10.0 * np.log10(p_serving_lin / noise_lin)
+
+            # Interference from the 2 constellation-mate HAPS (see docstring:
+            # no boresight feeder gain applied -- off-axis/sidelobe only).
+            interference_lin = 0.0
+            horiz_ranges = haps_horiz_ranges_to_user(d_m, spacing_km=constellation_spacing_km)
+            for interf_key in ['interferer1', 'interferer2']:
+                horiz_m = float(np.asarray(horiz_ranges[interf_key]).flat[0])
+                slant_km_i = float(np.sqrt(horiz_m ** 2 + dh_m ** 2) / 1000.0)
+                elevation_deg_i = float(np.degrees(np.arctan2(dh_m, horiz_m)))
+                loss_i_db = feeder_link_loss_with_scintillation(
+                    slant_km_i, elevation_deg_i, freq_ghz=38.0,
+                    p_time_percent=p_time_percent, include_scint=include_scint)
+                p_i_dbm = float(np.asarray(rx_power_dbm(p_tx_dbm, loss_i_db)).flat[0])
+                interference_lin += 10.0 ** (p_i_dbm / 10.0)
+
+            sinr_interferers = 10.0 * np.log10(interference_lin / noise_lin) if interference_lin > 0 else -200.0
+            sinr_actual = 10.0 * np.log10(p_serving_lin / (noise_lin + interference_lin))
+
+            results.append({
+                'Landscape': landscape,
+                'Distance_m': int(d_m),
+                'Slant_Distance_m': round(slant_km * 1000.0, 0),
+                'Elevation_deg': round(elevation_deg, 2),
+                'Signal_Power_dBm': round(p_serving_dbm, 2),
+                'SINR_Single': round(sinr_single, 2),
+                'SINR_Interferers': round(sinr_interferers, 2),
+                'SINR_Actual': round(sinr_actual, 2),
+            })
+
+    import pandas as pd
+    df = pd.DataFrame(results)
+    df.to_csv(output_file, index=False)
+    print(f"CSV exported: {output_file}")
+    return df
 
 
 # ----------------------------------------------------------------------

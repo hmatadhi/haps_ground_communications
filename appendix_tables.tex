@@ -19,7 +19,7 @@ not (this project uses its own carrier-frequency plan; see \S III.A).
 HAPS altitude & 20 km & Yes -- matches \texttt{HAPS\_ALT\_M} \\
 UAV altitude range ($h_{\min}$, $h_{\max}$) & 22.5\,m, 150\,m & No -- plots use 300\,m \\
 User height & 1.5 m & Yes \\
-Carrier freq.\ (UAV, HAPS) & 28 GHz, 2.11 GHz & No -- this project uses its own 2\,GHz service/relay and $\sim$38\,GHz feeder plan (\S III.A), not Arani's 28\,GHz UAV band \\
+Carrier freq.\ (UAV, HAPS) & 28 GHz, 2.11 GHz & No -- this project uses its own 2\,GHz service/relay and $\sim$38\,GHz backhaul/feeder plan (\S III.A), not Arani's 28\,GHz UAV band \\
 Transmit power (HAPS, UAV) & 43 dBm, 24 dBm & Yes -- \texttt{P\_TX\_HAPS\_DBM}, \texttt{P\_TX\_UAV\_DBM} \\
 Noise power spectral density & $-174$ dBm/Hz & No -- flat \texttt{NOISE\_DBM}=$-100$\,dBm used instead (consistent with $\sim$14\,MHz channel BW) \\
 $\alpha,\beta,\xi$ (LoS probability) & 0.1, 750, 8 & Yes -- matches this document's ``suburban'' preset exactly (\S III.C); Arani et al.\ simulated only this one environment, sourced from Holis \& Pechac (2008) Table I \\
@@ -42,7 +42,7 @@ The following tables present comprehensive multi-distance and multi-frequency pa
 \label{table:app-sinr-multinode-distances}
 \small
 \input{./appendix_tables/Path_loss_comparison_2ghz_38ghz.tex}
-\caption{Table A.1: Path Loss Comparison (2 GHz service link, user at 1.5\,m vs.\ 38 GHz feeder link, gateway at 50\,m AGL). Eight distances (0--150\,km) from HAPS nadir. Pure free-space path loss per Eq.~\eqref{eq:fspl} -- the HAPS-side links have no landscape-dependent excess loss (\S III.C; Arani et al.\ Eq.\ 2). Frequency offset $20\log_{10}(38/2) \approx 25.58$~dB is independent of distance (constant at all distances), derived by canceling distance terms in Eq.~\eqref{eq:fspl}. Plotted version: Figure~\ref{fig:fspl_comparison}. Full data in \texttt{appendix\_data/} CSV files.}
+\caption{Table A.1: Path Loss Comparison (2 GHz service link, user at 1.5\,m vs.\ 38 GHz backhaul link, gateway at 50\,m AGL). Eight distances (0--150\,km) from HAPS nadir. Pure free-space path loss per Eq.~\eqref{eq:fspl} -- the HAPS-side links have no landscape-dependent excess loss (\S III.C; Arani et al.\ Eq.\ 2). Frequency offset $20\log_{10}(38/2) \approx 25.58$~dB is independent of distance (constant at all distances), derived by canceling distance terms in Eq.~\eqref{eq:fspl}. Plotted version: Figure~\ref{fig:fspl_comparison}. Full data in \texttt{appendix\_data/} CSV files.}
 \label{table:app-pathloss-2ghz-38ghz}
 \end{table}
 \begin{table}[htbp]
@@ -53,23 +53,21 @@ The following tables present comprehensive multi-distance and multi-frequency pa
 
 \FloatBarrier
 
-\subsection{Relay Path Analysis (HAPS\texorpdfstring{$\rightarrow$}{->}Gateway\texorpdfstring{$\rightarrow$}{->}UE)}
-\label{sec:app-relay}
+\subsection{Relay Path Analysis (HAPS\texorpdfstring{$\rightarrow$}{->}UAV\texorpdfstring{$\rightarrow$}{->}UE)}
+\label{sec:app-uav-relay}
 
-In addition to the two direct links above (HAPS\,$\rightarrow$\,UE service link,
-HAPS\,$\rightarrow$\,Gateway feeder link), Table~\ref{table:app-relay-comparison}
-compares the direct HAPS\,$\rightarrow$\,UE link against a decode-and-forward
-relay path routed through the Gateway (HAPS\,$\rightarrow$\,Gateway\,$\rightarrow$\,UE).
-The Gateway\,$\rightarrow$\,UE access hop reuses the same 2\,GHz band and transmit-power
-convention as the direct service link (\texttt{haps\_a2g\_pathloss\_db()}, evaluated
-at the Gateway's altitude instead of the HAPS's); the feeder hop reuses the existing
-38\,GHz feeder-link model including ITU-P.618 scintillation. The end-to-end relay
-capacity is the bottleneck of the two hops, $C_{\text{relay}} = \min(C_{\text{feeder}}, C_{\text{access}})$,
-implemented in \texttt{relay\_two\_hop\_capacity\_bps\_hz()}. This is a distinct
-concept from the still-unmodeled User\,$\rightarrow$\,UAV\,$\rightarrow$\,HAPS relay
-referenced elsewhere in this document (\S\ref{sec:app-arani-table1}).
+Table~\ref{table:app-uav-relay-comparison} gives the full numeric backing for
+the UAV relay path introduced in \S\ref{sec:relay-path-analysis} and modeled
+by \texttt{uav\_relay\_two\_hop\_capacity\_bps\_hz()}: a 38\,GHz
+HAPS\,$\rightarrow$\,UAV first hop (the feeder link; slant path, UAV hovering at
+500\,m, with ITU-P.618 scintillation) combined decode-and-forward with a
+2\,GHz, landscape-dependent UAV\,$\rightarrow$\,UE second hop. Suburban and
+high-rise are shown (best/worst case for the landscape-dependent second hop);
+all four landscapes are in \texttt{appendix\_data/UAV\_relay\_path\_comparison.csv}.
 
-\input{./appendix_tables/Relay_path_comparison.tex}
+\input{./appendix_tables/UAV_relay_path_comparison.tex}
+
+\FloatBarrier
 
 \subsection{Table A.3: Spatial Heterogeneity Analysis (2D SINR Distribution)}
 \label{sec:app-spatial-sinr}

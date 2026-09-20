@@ -4,9 +4,9 @@ Generate Relay Path Comparison Table: Direct (HAPS->UE) vs. Relay (HAPS->Gateway
 
 Both links reuse the same 2 GHz service band and haps_a2g_pathloss_db()
 convention (see generate_pathloss_table.py); the relay path additionally
-bottlenecks against the 38 GHz HAPS->Gateway feeder link via
-relay_two_hop_capacity_bps_hz() (decode-and-forward), including feeder
-scintillation and an optional rain-derated feeder scenario.
+bottlenecks against the 38 GHz HAPS->Gateway backhaul link via
+relay_two_hop_capacity_bps_hz() (decode-and-forward), including backhaul-hop
+scintillation and an optional rain-derated backhaul-hop scenario.
 """
 
 import sys
@@ -28,8 +28,8 @@ os.makedirs('appendix_tables', exist_ok=True)
 USER_ALT_M = 1.5
 FREQ_SERVICE_HZ = 2.0e9
 
-# Fixed feeder-hop geometry: Gateway is co-located near the HAPS ground
-# nadir point (matches generate_pathloss_table.py's 10-500 m feeder-distance
+# Fixed backhaul-hop geometry: Gateway is co-located near the HAPS ground
+# nadir point (matches generate_pathloss_table.py's 10-500 m backhaul-distance
 # convention), so the elevation angle from the HAPS to the Gateway is close
 # to 90 degrees regardless of the (short) horizontal offset.
 FEEDER_DIST_KM = 0.1
@@ -56,14 +56,14 @@ for dist_km in DISTANCES_ACCESS_KM:
     ).flat[0])
     capacity_direct = float(np.log2(1.0 + 10.0 ** (sinr_direct_db / 10.0)))
 
-    # Relay HAPS->Gateway->UE (clear-sky feeder)
+    # Relay HAPS->Gateway->UE (clear-sky backhaul hop)
     relay_clear = relay_two_hop_capacity_bps_hz(
         feeder_dist_km=FEEDER_DIST_KM, feeder_elevation_deg=FEEDER_ELEVATION_DEG,
         gw_ue_dist_m=r_m, include_scint=True,
     )
     capacity_relay_clear = float(np.asarray(relay_clear["capacity_relay_bps_hz"]).flat[0])
 
-    # Relay with a rain-derated feeder hop (10 mm/h moderate rain)
+    # Relay with a rain-derated backhaul hop (10 mm/h moderate rain)
     rain_mm_h = 10.0
     feeder_rain = feeder_link_rain_effect_on_capacity(rain_mm_h)
     capacity_relay_rain = capacity_relay_clear * float(
@@ -83,8 +83,8 @@ for dist_km in DISTANCES_ACCESS_KM:
 df = pd.DataFrame(results)
 
 print(df.to_string(index=False))
-print(f"\nFeeder hop (fixed): dist={FEEDER_DIST_KM} km, elevation={FEEDER_ELEVATION_DEG} deg")
-print("Note: relay capacity is decode-and-forward, bottlenecked by min(feeder, access) capacity.")
+print(f"\nBackhaul hop (fixed): dist={FEEDER_DIST_KM} km, elevation={FEEDER_ELEVATION_DEG} deg")
+print("Note: relay capacity is decode-and-forward, bottlenecked by min(backhaul, access) capacity.")
 
 # ============================================================================
 # Export CSV
@@ -113,11 +113,11 @@ with open('Relay_path_comparison.tex', 'w') as f:
     f.write(latex_main)
 print("[OK] LaTeX table saved (main document): Relay_path_comparison.tex")
 
-latex_appendix = f"""\\begin{{table}}[H]
+latex_appendix = f"""\\begin{{table}}[htbp]
 \\centering
 \\small
 {latex_main}
-\\caption{{Table A.2: Direct (HAPS\\textrightarrow UE) vs. relay (HAPS\\textrightarrow Gateway\\textrightarrow UE) link comparison. The relay path is decode-and-forward, combining the 38\\,GHz feeder hop (fixed at {FEEDER_DIST_KM}\\,km, {FEEDER_ELEVATION_DEG}$^\\circ$ elevation, with ITU-P.618 scintillation) and the 2\\,GHz Gateway\\textrightarrow UE access hop (same band/power convention as the direct service link) as $C_{{\\text{{relay}}}} = \\min(C_{{\\text{{feeder}}}}, C_{{\\text{{access}}}})$. A 10\\,mm/h rain scenario de-rates the feeder hop per ITU-R P.838.}}
+\\caption{{Table A.2: Direct (HAPS\\textrightarrow UE) vs. relay (HAPS\\textrightarrow Gateway\\textrightarrow UE) link comparison. The relay path is decode-and-forward, combining the 38\\,GHz backhaul hop (fixed at {FEEDER_DIST_KM}\\,km, {FEEDER_ELEVATION_DEG}$^\\circ$ elevation, with ITU-P.618 scintillation) and the 2\\,GHz Gateway\\textrightarrow UE access hop (same band/power convention as the direct service link) as $C_{{\\text{{relay}}}} = \\min(C_{{\\text{{backhaul}}}}, C_{{\\text{{access}}}})$. A 10\\,mm/h rain scenario de-rates the backhaul hop per ITU-R P.838.}}
 \\label{{table:app-relay-comparison}}
 \\end{{table}}
 """

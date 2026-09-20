@@ -68,6 +68,34 @@ Networks (NTN),'' Release 17, September 2022.
 Available: \url{https://www.3gpp.org/DynaReport/38821.htm}
 [HAPS frequency allocations: 38--39.5 GHz feeder, 2.1--2.2 GHz service; UAV relay scenarios]
 
+\bibitem{3gpp_ts38214}
+3GPP TS 38.214, ``NR; Physical layer procedures for data,'' Release 16, 2021.
+Available: \url{https://www.3gpp.org/DynaReport/38214.htm}
+[CQI/MCS-to-SINR design reference: CQI index 1 (QPSK, code rate 78/1024)
+requires $\mathrm{SINR}\approx-6$\,dB; CQI index 7 (16-QAM, code rate
+378/1024) requires $\mathrm{SINR}\approx+5$\,dB; CQI index 15 (256-QAM, code
+rate 948/1024) requires $\mathrm{SINR}>+22$\,dB, all at the standard 10\% first-
+transmission BLER target.]
+
+\bibitem{karaman2025haps}
+B.~Karaman, I.~Basturk, F.~Kara, E.~Zeydan, E.~A.~Beyazit, S.~Taskin,
+E.~Bj\"ornson, and H.~Yanikomeroglu, ``On-Demand HAPS-Assisted Communication
+System for Public Safety in Emergency and Disaster Response,'' \emph{IEEE
+Commun. Mag.}, 2025. arXiv:2507.09153.
+[Ka-band (30\,GHz) HAPS backhaul link budget, Table I: Tx power 43.2\,dBm, Tx
+antenna gain 13.8\,dBi, Rx (VSAT) antenna gain 39.7\,dBi -- used here as the
+literature-typical antenna-gain basis for this document's 38\,GHz
+feeder-style links, \S\ref{sec:relay-path-analysis}.]
+
+\bibitem{anim2021uav}
+K.~Anim, J.-N.~Lee, and Y.-B.~Jung, ``High-Gain Millimeter-Wave Patch Array
+Antenna for Unmanned Aerial Vehicle Application,'' \emph{Sensors}, vol.~21,
+no.~11, p.~3914, 2021. DOI: 10.3390/s21113914
+[UAV-mountable $32\times32$ mmWave patch array antenna, realized gain
+30.7--32.8\,dBi at 25.4--26.9\,GHz -- basis for this document's UAV-side
+receive antenna gain on the HAPS\,$\rightarrow$\,UAV hop,
+\S\ref{sec:relay-path-analysis}.]
+
 \bibitem{3gpp_ts36104}
 3GPP TS 36.104, ``Evolved Universal Terrestrial Radio Access (E-UTRA); Base Station
 (BS) Radio Transmission and Reception,'' Release 16, December 2021.

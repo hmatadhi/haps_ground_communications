@@ -1,4 +1,3 @@
-\begin{table}[H]
 \centering
 \small
 \begin{tabular}{rrlrl}
@@ -12,22 +11,18 @@ Distance km & Frequency GHz & Frequency Name & Path Loss Blended dB & Link Type 
 50.0 & 2.0 & 2 GHz (Service) & 133.1 & Service \\
 75.0 & 2.0 & 2 GHz (Service) & 136.3 & Service \\
 100.0 & 2.0 & 2 GHz (Service) & 138.6 & Service \\
-0.0 & 38.0 & 38 GHz (Feeder) & 150.0 & Feeder \\
-0.1 & 38.0 & 38 GHz (Feeder) & 150.0 & Feeder \\
-0.1 & 38.0 & 38 GHz (Feeder) & 150.0 & Feeder \\
-0.2 & 38.0 & 38 GHz (Feeder) & 150.0 & Feeder \\
-0.3 & 38.0 & 38 GHz (Feeder) & 150.0 & Feeder \\
-0.5 & 38.0 & 38 GHz (Feeder) & 150.0 & Feeder \\
-0.0 & 38.0 & 38 GHz (Relay, HAPS-UAV) & 149.8 & Relay \\
-10.0 & 38.0 & 38 GHz (Relay, HAPS-UAV) & 150.9 & Relay \\
-20.0 & 38.0 & 38 GHz (Relay, HAPS-UAV) & 153.0 & Relay \\
-30.0 & 38.0 & 38 GHz (Relay, HAPS-UAV) & 155.1 & Relay \\
-50.0 & 38.0 & 38 GHz (Relay, HAPS-UAV) & 158.6 & Relay \\
-75.0 & 38.0 & 38 GHz (Relay, HAPS-UAV) & 161.8 & Relay \\
-100.0 & 38.0 & 38 GHz (Relay, HAPS-UAV) & 164.2 & Relay \\
+0.0 & 38.0 & 38 GHz (Backhaul) & 150.0 & Backhaul \\
+0.1 & 38.0 & 38 GHz (Backhaul) & 150.0 & Backhaul \\
+0.1 & 38.0 & 38 GHz (Backhaul) & 150.0 & Backhaul \\
+0.2 & 38.0 & 38 GHz (Backhaul) & 150.0 & Backhaul \\
+0.3 & 38.0 & 38 GHz (Backhaul) & 150.0 & Backhaul \\
+0.5 & 38.0 & 38 GHz (Backhaul) & 150.0 & Backhaul \\
+0.0 & 38.0 & 38 GHz (Feeder, HAPS-UAV) & 149.8 & Feeder \\
+10.0 & 38.0 & 38 GHz (Feeder, HAPS-UAV) & 150.9 & Feeder \\
+20.0 & 38.0 & 38 GHz (Feeder, HAPS-UAV) & 153.0 & Feeder \\
+30.0 & 38.0 & 38 GHz (Feeder, HAPS-UAV) & 155.1 & Feeder \\
+50.0 & 38.0 & 38 GHz (Feeder, HAPS-UAV) & 158.6 & Feeder \\
+75.0 & 38.0 & 38 GHz (Feeder, HAPS-UAV) & 161.8 & Feeder \\
+100.0 & 38.0 & 38 GHz (Feeder, HAPS-UAV) & 164.2 & Feeder \\
 \bottomrule
 \end{tabular}
-
-\caption{Table A.1: Path Loss Comparison (2 GHz Service Link, 38 GHz Feeder Link, and 38 GHz Relay Link). Pure free-space path loss -- all three links originate at the HAPS (20 km altitude) and have no landscape-dependent excess loss (Arani et al.\ Eq.\ 2; see channel\_model.py). The Service link (2 GHz) and Relay link (38 GHz, to a UAV at 500\,m altitude) are both swept over 0--100\,km; the Feeder link (38 GHz, to a $\sim$50\,m gateway) is swept over the short 0--0.5\,km backhaul range. Consistent $\sim$25.6\,dB frequency offset between the Service and Relay links (same geometry, different band) validates the free-space model at both bands.}
-\label{table:app-pathloss-2ghz-38ghz}
-\end{table}

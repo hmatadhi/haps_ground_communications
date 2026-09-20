@@ -56,16 +56,21 @@ def make_env(seed):
 
 
 def max_sinr_policy(state, env):
-    # Extended "naive" baseline: pick whichever of the 6 actions (direct to
-    # HAPS 0-2, or relay via HAPS 0-2's Gateway) gives the highest Shannon
-    # capacity. Direct capacity is derived from state columns 0:3 (normalised
-    # SINR, denormalised back to dB); relay capacity is state columns 12:15
-    # (normalised bps/Hz), both denormalised with haps_association_env's own
-    # bounds so this stays consistent with however the env normalises them.
+    # Extended "naive" baseline: pick whichever of the 9 actions (direct to
+    # HAPS 0-2, relay via HAPS 0-2's Gateway, or relay via a UAV served by
+    # HAPS 0-2) gives the highest Shannon capacity. Direct capacity is
+    # derived from state columns 0:3 (normalised SINR, denormalised back to
+    # dB); Gateway-relay capacity is state columns 12:15 and UAV-relay
+    # capacity is state columns 15:18 (both normalised bps/Hz), all
+    # denormalised with haps_association_env's own bounds so this stays
+    # consistent with however the env normalises them.
     sinr_db = state[:, 0:3] * (SINR_DB_MAX - SINR_DB_MIN) + SINR_DB_MIN
     direct_capacity = np.log2(1.0 + 10.0 ** (sinr_db / 10.0))
-    relay_capacity = state[:, 12:15] * CAPACITY_BPS_HZ_MAX
-    combined_capacity = np.concatenate([direct_capacity, relay_capacity], axis=1)  # (n_users, 6)
+    gw_relay_capacity = state[:, 12:15] * CAPACITY_BPS_HZ_MAX
+    uav_relay_capacity = state[:, 15:18] * CAPACITY_BPS_HZ_MAX
+    combined_capacity = np.concatenate(
+        [direct_capacity, gw_relay_capacity, uav_relay_capacity], axis=1
+    )  # (n_users, 9)
     return np.argmax(combined_capacity, axis=1)
 
 

@@ -103,7 +103,7 @@ with open('SINR_multinode_table_distances.tex', 'w') as f:
     f.write(latex_main)
 print("[OK] LaTeX table saved (main document): SINR_multinode_table_distances.tex")
 
-latex_appendix = f"""\\begin{{table}}[H]
+latex_appendix = f"""\\begin{{table}}[htbp]
 \\centering
 \\small
 {latex_main}

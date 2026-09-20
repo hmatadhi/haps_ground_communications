@@ -126,6 +126,7 @@ python generators\generate_figure_9b_scintillation_comparison.py
 python generators\generate_sinr_table.py
 python generators\generate_pathloss_table.py
 python generators\generate_relay_table.py
+python generators\generate_uav_relay_table.py
 python generators\generate_atm_loss_tables.py
 python generators\generate_figures.py
 python generators\generate_phase2_figures.py

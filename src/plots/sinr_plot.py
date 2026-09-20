@@ -75,9 +75,14 @@ def generate_haps_sinr_chart(csv_file, output_png=None):
         ax2.set_ylabel('SINR Interferers [dB]', fontsize=10, color='#D32F2F')
         ax2.tick_params(axis='y', labelcolor='#D32F2F', labelsize=9)
 
-        # Determine y-axis for secondary (SINR_Interferers/loss)
+        # Determine y-axis for secondary (SINR_Interferers/loss). Values can be
+        # deeply negative (e.g. a noise-limited feeder link where interference
+        # is far below the noise floor), so don't assume a positive-only range.
+        interf_min = data['SINR_Interferers'].min()
         interf_max = data['SINR_Interferers'].max()
-        ax2.set_ylim(0, interf_max * 1.2)  # 20% margin above max
+        span = max(abs(interf_max - interf_min), 1.0)
+        margin = span * 0.2
+        ax2.set_ylim(min(0.0, interf_min - margin), max(0.0, interf_max + margin))
 
         # Legend (first subplot only)
         if i == 0:

@@ -179,6 +179,7 @@ declare -a GENERATORS=(
   "generate_sinr_table.py"
   "generate_pathloss_table.py"
   "generate_relay_table.py"
+  "generate_uav_relay_table.py"
   "generate_atm_loss_tables.py"
   "generate_figures.py"
   "generate_phase2_figures.py"

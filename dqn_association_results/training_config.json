@@ -8,6 +8,6 @@
   "max_steps": 24,
   "weather_mode": "random_mix",
   "device": "cuda",
-  "state_dim": 12,
-  "n_actions": 3
+  "state_dim": 18,
+  "n_actions": 9
 }

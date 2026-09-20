@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Generate nominal and worst-case atmospheric loss tables for the 38 GHz feeder link.
+Generate nominal and worst-case atmospheric loss tables for the 38 GHz backhaul link.
 
 Fills in tab:atm_losses_nominal / tab:atm_losses_worstcase -- referenced in
 HAPS_AI_HW_ChannelModel.tex (S III.B) since the document was first written,
 but never generated. Geometry matches the existing text: nominal = 50km
 horizontal / 21.75 deg elevation / 54km slant path; worst-case = 100km
 horizontal / 11.3 deg elevation / 102km slant path (100km service-radius
-edge, per S "Feeder Link Geometry").
+edge, per S "Backhaul Link Geometry").
 """
 
 import os
@@ -32,7 +32,7 @@ SCENARIOS = {
 }
 
 print("=" * 70)
-print("Atmospheric Loss Tables: Nominal vs Worst-Case (38 GHz feeder link)")
+print("Atmospheric Loss Tables: Nominal vs Worst-Case (38 GHz backhaul link)")
 print("=" * 70)
 
 rows = []
@@ -92,7 +92,7 @@ Scintillation (P.618, {TIME_PERCENTAGE:g}\\% outage) & {row['Scintillation_dB']:
 \\textbf{{Total}} & \\textbf{{{row['Total_dB']:.2f}}} \\\\
 \\hline
 \\end{{tabular}}
-\\caption{{Atmospheric loss breakdown, {scenario_name}: 38\\,GHz feeder link, {row['Elevation_deg']:.2f}$^\\circ$ elevation, {row['Slant_path_km']:.0f}\\,km slant path, {RAIN_RATE_MMHR:.0f}\\,mm/h rain, Delhi.}}
+\\caption{{Atmospheric loss breakdown, {scenario_name}: 38\\,GHz backhaul link, {row['Elevation_deg']:.2f}$^\\circ$ elevation, {row['Slant_path_km']:.0f}\\,km slant path, {RAIN_RATE_MMHR:.0f}\\,mm/h rain, Delhi.}}
 \\label{{{label}}}
 \\end{{table}}
 """
