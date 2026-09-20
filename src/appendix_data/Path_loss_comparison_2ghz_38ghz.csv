@@ -12,3 +12,10 @@ Distance_km,Frequency_GHz,Frequency_Name,Path_Loss_Blended_dB,Link_Type
 0.2,38.0,38 GHz (Feeder),150.0,Feeder
 0.3,38.0,38 GHz (Feeder),150.0,Feeder
 0.5,38.0,38 GHz (Feeder),150.0,Feeder
+0.0,38.0,"38 GHz (Relay, HAPS-UAV)",149.8,Relay
+10.0,38.0,"38 GHz (Relay, HAPS-UAV)",150.9,Relay
+20.0,38.0,"38 GHz (Relay, HAPS-UAV)",153.0,Relay
+30.0,38.0,"38 GHz (Relay, HAPS-UAV)",155.1,Relay
+50.0,38.0,"38 GHz (Relay, HAPS-UAV)",158.6,Relay
+75.0,38.0,"38 GHz (Relay, HAPS-UAV)",161.8,Relay
+100.0,38.0,"38 GHz (Relay, HAPS-UAV)",164.2,Relay

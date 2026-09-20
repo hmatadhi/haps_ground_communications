@@ -1,0 +1,8 @@
+Distance_km,SINR_Direct_dB,Capacity_Direct_bps_Hz,SINR_Access_dB,Capacity_Relay_ClearSky_bps_Hz,Capacity_Relay_Rain10mmh_bps_Hz,Relay_Beats_Direct_ClearSky
+0,18.5,6.17,70.8,13.01,0.65,True
+10,17.5,5.85,24.5,8.16,0.41,True
+20,15.5,5.19,18.5,6.17,0.31,True
+30,13.4,4.52,15.0,5.03,0.25,True
+50,9.9,3.43,10.6,3.63,0.18,True
+75,6.7,2.52,7.0,2.6,0.13,True
+100,4.4,1.9,4.5,1.94,0.1,True

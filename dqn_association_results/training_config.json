@@ -1,0 +1,13 @@
+{
+  "n_users": 50,
+  "episodes": 300,
+  "eval_every": 10,
+  "eval_episodes": 8,
+  "eval_seed": 999,
+  "training_seed": 42,
+  "max_steps": 24,
+  "weather_mode": "random_mix",
+  "device": "cuda",
+  "state_dim": 12,
+  "n_actions": 3
+}

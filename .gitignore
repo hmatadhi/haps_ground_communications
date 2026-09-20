@@ -1,0 +1,15 @@
+.cc-history/
+
+# LaTeX build artifacts
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.toc
+*.synctex.gz
+
+# Python bytecode / notebook checkpoints
+__pycache__/
+*.pyc
+.ipynb_checkpoints/

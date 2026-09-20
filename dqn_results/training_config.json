@@ -1,0 +1,12 @@
+{
+  "n_uav": 3,
+  "n_users": 200,
+  "n_channels": 3,
+  "episodes": 400,
+  "eval_every": 10,
+  "eval_episodes": 8,
+  "eval_seed": 999,
+  "training_seed": 42,
+  "weather_mode": "random_mix",
+  "device": "cuda"
+}

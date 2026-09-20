@@ -1,0 +1,20 @@
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{rrrrrrr}
+\toprule
+Distance km & SINR Direct dB & Capacity Direct bps Hz & SINR Access dB & Capacity Relay ClearSky bps Hz & Capacity Relay Rain10mmh bps Hz & Relay Beats Direct ClearSky \\
+\midrule
+0 & 18.50 & 6.17 & 70.80 & 13.01 & 0.65 & True \\
+10 & 17.50 & 5.85 & 24.50 & 8.16 & 0.41 & True \\
+20 & 15.50 & 5.19 & 18.50 & 6.17 & 0.31 & True \\
+30 & 13.40 & 4.52 & 15.00 & 5.03 & 0.25 & True \\
+50 & 9.90 & 3.43 & 10.60 & 3.63 & 0.18 & True \\
+75 & 6.70 & 2.52 & 7.00 & 2.60 & 0.13 & True \\
+100 & 4.40 & 1.90 & 4.50 & 1.94 & 0.10 & True \\
+\bottomrule
+\end{tabular}
+
+\caption{Table A.2: Direct (HAPS\textrightarrow UE) vs. relay (HAPS\textrightarrow Gateway\textrightarrow UE) link comparison. The relay path is decode-and-forward, combining the 38\,GHz feeder hop (fixed at 0.1\,km, 89.0$^\circ$ elevation, with ITU-P.618 scintillation) and the 2\,GHz Gateway\textrightarrow UE access hop (same band/power convention as the direct service link) as $C_{\text{relay}} = \min(C_{\text{feeder}}, C_{\text{access}})$. A 10\,mm/h rain scenario de-rates the feeder hop per ITU-R P.838.}
+\label{table:app-relay-comparison}
+\end{table}
