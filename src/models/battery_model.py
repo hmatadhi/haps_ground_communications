@@ -153,23 +153,34 @@ def feeder_link_rain_effect_on_capacity(rain_mm_h: float) -> dict:
     Returns:
         Dict with attenuation and resulting capacity
     """
-    # ITU-R P.838 rain model at 38 GHz
-    # A_rain = k * R^α, where k=0.0315, α=0.921 for 38 GHz
-    k = 0.0315
-    alpha = 0.921
+    # ITU-R P.838 specific attenuation at 38 GHz, 89.86 deg elevation (gateway
+    # geometry), horizontal polarisation: gamma_R = K_RAIN * R^ALPHA_RAIN [dB/km].
+    # Source: itur.models.itu838.rain_specific_attenuation_coefficients(38, 89.86, 0)
+    K_RAIN = 0.3923
+    ALPHA_RAIN = 0.8687
 
-    rain_attenuation_db = k * (rain_mm_h ** alpha)
+    # ITU-R P.839 rain height for Delhi (28.61 N, 77.21 E), km.
+    # Source: itur.models.itu839.rain_height(28.61, 77.21)
+    H_RAIN_KM = 5.278
+    H_GATEWAY_KM = 0.05          # gateway altitude (50 m AGL)
+    ELEVATION_DEG = 89.86        # HAPS (20 km) to gateway, near zenith
 
-    # For 102 km slant path with reduction factor r(θ) ≈ 0.65
-    slant_path_km = 102.0
-    reduction_factor = 0.65
-    effective_path_km = slant_path_km * reduction_factor
+    specific_db_per_km = K_RAIN * (max(rain_mm_h, 0.0) ** ALPHA_RAIN)
 
-    total_rain_loss_db = rain_attenuation_db * effective_path_km
+    # ITU-R P.618 slant path through the rain layer.
+    slant_rain_km = (H_RAIN_KM - H_GATEWAY_KM) / np.sin(np.radians(ELEVATION_DEG))
+    horiz_rain_km = slant_rain_km * np.cos(np.radians(ELEVATION_DEG))
+
+    # P.618 path reduction factor (Eq. 2.2.1.1 of ITU-R P.618).
+    reduction_factor = 1.0 / (1.0 + 0.78 * np.sqrt(horiz_rain_km * specific_db_per_km)
+                              - 0.38 * (1.0 - np.exp(-2.0 * horiz_rain_km)))
+
+    effective_path_km = slant_rain_km * reduction_factor
+    total_rain_loss_db = specific_db_per_km * effective_path_km
 
     return {
         "rain_mm_h": rain_mm_h,
-        "rain_attenuation_db_per_km": rain_attenuation_db,
+        "rain_attenuation_db_per_km": specific_db_per_km,
         "effective_path_km": effective_path_km,
         "total_rain_loss_db": total_rain_loss_db
     }

@@ -35,7 +35,7 @@ OUT_DIR = os.path.join(ROOT, "data", "processed", "dqn_real")
 
 SEED = 42
 N_USERS = 50
-EPISODES = 300
+EPISODES = 400
 EVAL_EVERY = 10
 MAX_STEPS = 24
 

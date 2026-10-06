@@ -58,6 +58,9 @@ def train_dqn(seed: int, train_eps, device: str) -> DQNAgent:
 
 
 def evaluate(eval_eps, name: str, seed: int, policy_factory) -> list[dict]:
+    # random_policy draws from the global NumPy RNG; reseed it so every evaluation is
+    # reproducible and independent of what ran earlier in the process.
+    np.random.seed(seed + 1000)
     env = RealEpisodeEnv(eval_eps, seed=seed + 1000)
     rows = []
     for _ in range(len(eval_eps)):

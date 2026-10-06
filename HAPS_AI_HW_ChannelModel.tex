@@ -67,7 +67,7 @@ ITU-R atmospheric losses (rain, fog, gas, scintillation) for backhaul-
 and feeder-link design. The channel model is realised in Python (NumPy +
 Matplotlib + itur package) and characterised through signal-
 quality curves, spatial-heterogeneity analysis, and atmospheric
-sensitivity results. An LSTM forecasts 38\,GHz feeder rain attenuation six hours ahead; on held-out 2026 data it is more accurate than persistence only at four to six hours. A DQN agent using this forecast earns higher reward and lower outage than max-SINR across five seeds, but lower fairness.
+sensitivity results. An LSTM forecasts 38\,GHz feeder rain attenuation up to six hours ahead; on held-out 2026 data it is more accurate than persistence only at four to six hours (RMSE), and the DQN uses its one-hour-ahead forecast. A DQN agent using this forecast earns higher reward and lower outage than max-SINR across five seeds, but lower fairness.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -100,7 +100,7 @@ A typical HAPS system consists of a stratospheric, solar-powered platform operat
 \subsection{Challenges and Impacts on Connectivity}
 \subsubsection{Atmospheric Losses}
 \begin{itemize}
-  \item The 38.0--39.5 GHz link (Ka-band) incurs significant atmospheric loss from rain (specific attenuation $\approx$3.0--6.8\,dB/km at 10--25\,mm/h per ITU-R P.838~\cite{itu_p838}), fog~\cite{itu_p840}, and gas absorption~\cite{itu_p676}. The 38 GHz band is still chosen as it offers practical spectrum allocation and manageable link margins avoiding the 22.235 GHz water-vapor absorption resonance~\cite{itu_p676} and the 60 GHz oxygen peak~\cite{itu_p676}.
+  \item The 38.0--39.5 GHz link (Ka-band) incurs significant atmospheric loss from rain (specific attenuation $\approx$3.0--6.8\,dB/km at 10--25\,mm/h per ITU-R P.838~\cite{itu_p838}), fog~\cite{itu_p840}, and gas absorption~\cite{itu_p676}. The 38 GHz band is still chosen as it offers practical spectrum allocation, avoiding the 22.235 GHz water-vapor absorption resonance~\cite{itu_p676} and the 60 GHz oxygen peak~\cite{itu_p676}.
   \item The 2 GHz link exhibits high resilience to atmospheric effects according to ITU-R P.618~\cite{itu_p618}, providing a stable ``last-mile'' connection even under adverse weather. But it is sensitive to building blockage, which can cause significant path loss.
 \end{itemize}
 \subsubsection{Elevation Angle and Slant Path}
@@ -253,7 +253,7 @@ A_\mathrm{rain} = \gamma_R \; L_\mathrm{eff} \quad [\mathrm{dB}],
 
 \subsubsection{Equation (3) --- Total Rain Attenuation~\cite{itu_p618}}
 The effective path length $L_\mathrm{eff}$ follows ITU-R P.618~\cite{itu_p618} (slant-path reduction factors and
-site-dependent scaling for non-uniform rain along the path). The specific attenuation above is reported directly: for the 38\,GHz, $11.3^\circ$ worst-case backhaul path (102\,km slant), $\gamma_R\approx3.0$\,dB/km at 10\,mm/h and $\approx6.8$\,dB/km at 25\,mm/h. Multiplying by $L_\mathrm{eff}$ gives the path attenuation for a given rain rate; that product is evaluated against the site rain statistics in the link-budget analysis rather than here.
+site-dependent scaling for non-uniform rain along the path). The specific attenuation above is reported directly: for the 38\,GHz, $11.3^\circ$ worst-case backhaul path (102\,km slant), $\gamma_R\approx3.0$\,dB/km at 10\,mm/h and $\approx6.8$\,dB/km at 25\,mm/h. Multiplying by $L_\mathrm{eff}$ gives the path attenuation for a given rain rate. For the gateway geometry (89.86\,$^\circ$, 5.2\,km of rain), the path attenuation at a given rate is $\gamma_R L_s r$, where $L_s$ is the slant length through the rain layer and $r$ is the P.618 reduction factor. For Delhi, the ITU-R P.837 rain rate exceeded 0.1\,\% of the time is $R_{0.1}=15.7$\,mm/h, which gives $\approx19$\,dB of rain loss on the gateway path. The clear-sky gateway SNR is about 46\,dB, so after rain at 0.1\,\% about 27\,dB remains. The gaseous loss on the gateway path is $\approx0.4$\,dB (ITU-R P.676, $\rho=10$\,g/m$^3$), leaving about 26\,dB. The 38\,GHz gateway link therefore closes at 99.9\,\% availability. The 0.01\,\% rate ($R_{0.01}=61.8$\,mm/h) would give $\approx56$\,dB and is not the design target.
 
 \subsubsection{Equation (4) --- Fog/Cloud Attenuation~\cite{itu_p840}}
 Fog attenuation depends on the liquid-water density $M$ [g/m$^3$], frequency
@@ -295,7 +295,7 @@ Tropospheric scintillation refers to rapid fluctuations in signal amplitude and
 phase caused by small-scale refractive-index irregularities in the lower
 troposphere per ITU-R P.618~\cite{itu_p618}. In Ka-band (around 38 GHz) backhaul/feeder links, scintillation can cause
 dynamic fading even in clear-sky conditions and must be taken into account when
-designing beam-tracking and link-budget margins~\cite{itu_p618}.
+designing beam-tracking and link-budget fade allowances~\cite{itu_p618}.
 
 The fade depth due to scintillation for a specific time percentage $p$ is
 commonly expressed as short-term amplitude fluctuations using the time percentage model (ITU-R P.618, Annex 1~\cite{itu_p618}):
@@ -307,7 +307,7 @@ A_\mathrm{scint}(p) = a(p) \cdot \sigma_{pre}(f,\theta,\mathrm{climate}) \quad [
 where $a(p)$ maps standard-deviation values to time-percentage fades (ITU-R P.618 Annex 1~\cite{itu_p618})
 and $\sigma_{pre}$ is calculated from the frequency, elevation angle $\theta$ and
 local turbulence parameters in the recommendation. We then scale by $a(p)$ to obtain fade depths
-for availability analyses and margin setting in adaptive systems. For 38 GHz at 11.3$^\circ$ elevation
+for availability analyses and fade-allowance setting in adaptive systems. For 38 GHz at 11.3$^\circ$ elevation
 and 0.01% outage, typical scintillation fade is 2--4 dB~\cite{itu_p618}.
 
 So total slant-path attenuation for a backhaul link may be written as
@@ -374,7 +374,7 @@ Computed from horizontal distance $r_{u,k}$ (meters), building density $\beta$ [
 $\beta$ the mean building density [buildings/km$^2$], and $\xi$ a building-height parameter [m]. All are
 environment-dependent: for urban areas~\cite{holispechac2008},
 $\alpha=0.3$, $\beta=500$, $\xi=15$\,m; dense urban uses $\alpha=0.5$, $\beta=300$, $\xi=20$\,m;
-suburban $\alpha=0.1$, $\beta=750$, $\xi=8$\,m; high-rise $\alpha=0.5$, $\beta=300$, $\xi=50$\,m (Table I, cited in 300+ subsequent works)~\cite{holispechac2008}.
+suburban $\alpha=0.1$, $\beta=750$, $\xi=8$\,m; high-rise $\alpha=0.5$, $\beta=300$, $\xi=50$\,m (Table I)~\cite{holispechac2008}.
 
 \noindent\textbf{Landscape-based relay placement:} The LoS probability model above (Eq.~\eqref{eq:los}--\eqref{eq:losJ}), with its environment-dependent $\alpha,\beta,\xi$ parameter sets (urban, dense urban, suburban, high-rise), already provides the mechanism for determining where a UAV relay stays in LoS of its served users. This same mechanism determines the UAV relay's altitude and horizontal-offset placement per landscape, as introduced in \S II (Relay Link Geometry).
 
@@ -382,16 +382,21 @@ suburban $\alpha=0.1$, $\beta=750$, $\xi=8$\,m; high-rise $\alpha=0.5$, $\beta=3
 
 \subsubsection{Equation (10) --- Probability-Averaged Path Loss}
 Unlike terrestrial base stations, HAPS nodes operate at high elevation angles. This near-zenith positioning provides a superior Line-of-Sight (LoS) probability, significantly reducing multi-path fading and shadowing in urban and mountainous terrain.
-Each state $z\in\{\mathrm{LoS},\mathrm{NLoS}\}$ adds a mean excess loss $\eta_z$;
-the two are probability-averaged:
+Each state $z\in\{\mathrm{LoS},\mathrm{NLoS}\}$ adds an additional shadowing loss $X_z$ in dB:
+the LoS term is zero-mean log-normal with $\sigma_\mathrm{LoS}=4$\,dB (midpoint of the 3--5\,dB range in
+Holis \& Pechac~\cite{holispechac2008}); the NLoS term has mean $\mu(\theta)$ and standard deviation $\sigma(\theta)$
+from their Eq.~(4) and Table~IV (2\,GHz, all environments), with $\theta$ the elevation of the UAV as seen from the user.
+Because the shadowing is log-normal in linear gain, the states are averaged in linear gain, not in dB:
 \begin{align}
-\mathrm{PL}_z &= 20\log_{10}\!\Big(\tfrac{4\pi f d_\mathrm{3D}}{c}\Big) + \eta_z,\\
-\overline{\mathrm{PL}} &= P_\mathrm{LoS}\,\mathrm{PL}_\mathrm{LoS}
-                        + P_\mathrm{NLoS}\,\mathrm{PL}_\mathrm{NLoS},
+\overline{g} &= 10^{-\mathrm{FSPL}/10}\Big[P_\mathrm{LoS}\,e^{\tfrac{(a\sigma_\mathrm{LoS})^2}{2}}
+              + P_\mathrm{NLoS}\,e^{-a\mu(\theta)+\tfrac{(a\sigma(\theta))^2}{2}}\Big], \qquad a=\tfrac{\ln 10}{10},\\
+\overline{\mathrm{PL}} &= -10\log_{10}\overline{g},
 \label{eq:pl}
 \end{align}
-
-The first line computes path loss (free-space FSPL plus environment-dependent excess $\eta_z$) for LoS and NLoS states separately. The second line probability-averages over the LoS state (Eq.~\eqref{eq:los}). The 3D distance is $d_\mathrm{3D}=\sqrt{r^2+(h_u-h_k)^2}$ where $r$ is horizontal distance and $h_u, h_k$ are UAV and user altitudes respectively.
+where $\mathrm{FSPL}=20\log_{10}(4\pi f d_\mathrm{3D}/c)$ and $P_\mathrm{LoS}$ is the LoS probability (Eq.~\eqref{eq:los}).
+The 3D distance is $d_\mathrm{3D}=\sqrt{r^2+(h_u-h_k)^2}$ where $r$ is horizontal distance and $h_u, h_k$ are UAV and user altitudes.
+At elevations where $P_\mathrm{LoS}$ is near 0 or 1 the linear and dB averages agree; in between they differ by up to about 17\,dB,
+so the linear form is required for the expected received power.
 
 The received power follows the standard link-budget relation
 \begin{equation}
@@ -464,23 +469,29 @@ In the above figure we can see the FSPL for the following paths,
 \subsubsection{Scintillation fade depth}
 \label{subsec:scintillation}
 
-Tropospheric scintillation is rapid amplitude fluctuations caused by refractive-index turbulence in the lower atmosphere. It is governed by the frequency-dependent formula but same for both 38 GHz and 2 GHz as below 
+Tropospheric scintillation is rapid amplitude fluctuations caused by refractive-index turbulence in the lower atmosphere.
+The fade $A_s(p)$, exceeded for $p$\% of the time, is computed with the ITU-R P.618 method (\texttt{itur}
+implementation, scintillation attenuation) at the site 28.61\,N, 77.21\,E, with $T=15^\circ$\,C, relative humidity 60\,\%,
+pressure 1010\,hPa and antenna efficiency $\eta=0.5$. The aperture is $D=0.31$\,m for the 38\,GHz gateway link (the working-set
+gateway dish) and $D=1$\,m for the 2.1\,GHz link (a stated reference aperture). The table of $A_s(p)$ used in the model is:
 
-\begin{equation}
-D(p, \theta, f) = D_{\mathrm{ref}} \cdot \left(\frac{f}{f_{\mathrm{ref}}}\right)^{0.7}
-                 \cdot \frac{1}{\sin(\theta)} \cdot \sqrt{\log(1/p)} \quad [\mathrm{dB}],
-\label{eq:scint_fade}
-\end{equation}
-where:
-\begin{itemize}\setlength{\itemsep}{0pt}
-  \item $p$ = time percentage (availability criterion, e.g., $p=1\%$ means fade depth exceeded 1\% of the time, or 99\% availability)
-  \item $\theta$ = elevation angle from receiver to transmitter [degrees] 
-  \item $D_{\mathrm{ref}} = 2.5\,\mathrm{dB}$ = reference fade depth at K-band ($f_{\mathrm{ref}}=20\,\mathrm{GHz}$, $p=1\%$, $\theta=30^\circ$) per ITU-R P.618-13 Annex 2
-  \item Exponent $0.7$ is \textbf{empirical}, validated through radiowave propagation measurements
-\end{itemize}
+\begin{center}
+\begin{tabular}{lcccc}
+\toprule
+ & \multicolumn{2}{c}{38\,GHz, $D=0.31$\,m} & \multicolumn{2}{c}{2.1\,GHz, $D=1$\,m} \\
+Elevation & $p=0.01$\,\% & $p=1$\,\% & $p=0.01$\,\% & $p=1$\,\% \\
+\midrule
+$10^\circ$ & 1.76\,dB & 0.73\,dB & 0.33\,dB & 0.14\,dB \\
+$30^\circ$ & 0.49\,dB & 0.21\,dB & 0.09\,dB & 0.04\,dB \\
+$60^\circ$ & 0.25\,dB & 0.11\,dB & 0.05\,dB & 0.02\,dB \\
+$89.86^\circ$ & 0.21\,dB & 0.09\,dB & 0.04\,dB & 0.02\,dB \\
+\bottomrule
+\end{tabular}
+\end{center}
 
-
-Figure~\ref{fig:scint_fade_depth} fade depth ratio between 38~GHz and 2~GHz is  $7.854 = (38/2)^{0.7}$ and the db offset is $10 \log_{10} (7.85)=8.95\mathrm{dB}$, confirming the frequency scaling exponent in Equation~\eqref{eq:scint_fade}.
+The fade at $30^\circ$ is about 0.5\,dB at 38\,GHz and about 0.09\,dB at 2.1\,GHz for $p=0.01$\,\%. The fade grows with frequency and
+with decreasing elevation, as the P.618 method predicts. The earlier empirical fit, with an exponent of 0.7 that was not
+validated by measurement, is no longer used.
 
 \begin{figure}[ht]\centering
 \begin{subfigure}[b]{0.45\columnwidth}\centering
@@ -492,7 +503,7 @@ Figure~\ref{fig:scint_fade_depth} fade depth ratio between 38~GHz and 2~GHz is  
 \includegraphics[width=0.95\textwidth]{./figures/9b_scintillation_fade_vs_elev.png}
 \caption*{(b) vs.\ elevation}
 \end{subfigure}
-\caption{Scintillation fade depth characteristics (ITU P.618): \textbf{(a)} Fade depth vs.\ time percentage at five elevation angles ($10\circ$--$60\circ$). \textbf{(b)} Fade depth vs.\ elevation angle at five time percentages ($0.1\%$--$10\%$). Parametric analysis validates frequency scaling $(\propto f^{0.7})$, elevation scaling $(\propto 1/\sin\theta)$, and time-percentage scaling $(\propto \sqrt{\log(1/p)})$.}
+\caption{Scintillation fade depth characteristics (ITU-R P.618, \texttt{itur}, gateway geometry at 38\,GHz with $D=0.31$\,m and 2.1\,GHz with $D=1$\,m): \textbf{(a)} Fade depth vs.\ time percentage at five elevation angles ($10\circ$--$60\circ$). \textbf{(b)} Fade depth vs.\ elevation angle at four time percentages ($0.01\%$--$10\%$).}
 \label{fig:scint_fade_depth}
 \end{figure}
 
@@ -540,7 +551,7 @@ A Johnson--Nyquist thermal-noise model, $N=kTB$, or equivalently $N_{\text{dBm}}
 
 \subsubsection{Why 38 GHz instead of 2 GHz for the backhaul and feeder links}
 
-In comparison to $\sim$3.2° beamwidth obtained at 2GHz with 1m antenna, at 38 GHz, $\lambda = 7.9$\,mm;  can achieve $\sim$0.2° beamwidth,  enabling point-to-point backhaul/feeder links with interference rejection. Also higher frequencies enable wider bandwidth (Ka-band supports 1+ GHz channels). Also ITU-R allocates 2 GHz (S-band) for \emph{terrestrial mobile access} (3GPP) and 38--39.5 GHz (Ka-band) for \emph{fixed HAPS backhaul} (ITU-R M.2101). However 38 GHz band presents specific challenges with atmospheric loss, rain attenuation, and scintillation. The following sections analyze the frequency effects on atmospheric loss in detail.
+At 38 GHz, $\lambda = 7.9$\,mm, and the antenna gains of the link budget (\S\ref{subsec:backhaul-geometry}) set the 3\,dB beamwidths $\theta \approx \sqrt{41253/G}$ (degrees, $G$ linear): about $2.1^\circ$ for the gateway dish ($G_g = 39.7$\,dBi, $\approx0.31$\,m aperture at $\eta\approx0.6$), about $5.9^\circ$ for the UAV array ($G_u = 30.7$\,dBi, $\approx0.11$\,m), and about $41^\circ$ for the HAPS ($G_h = 13.8$\,dBi, a small patch). These narrow beams enable point-to-point backhaul/feeder links with interference rejection. Also higher frequencies enable wider bandwidth (Ka-band supports 1+ GHz channels). Also ITU-R allocates 2 GHz (S-band) for \emph{terrestrial mobile access} (3GPP) and 38--39.5 GHz (Ka-band) for \emph{fixed HAPS backhaul} (ITU-R M.2101). However 38 GHz band presents specific challenges with atmospheric loss, rain attenuation, and scintillation. The following sections analyze the frequency effects on atmospheric loss in detail.
  
 \begin{figure}[h!]\centering
 \includegraphics[width=0.95\columnwidth]{./figures/fig_atm_loss_nominal_frequency.png}
@@ -797,54 +808,31 @@ SINR on each hop against the direct HAPS\,$\rightarrow$\,UE link.
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{./figures/12_uav_relay_comparison.png}
-\caption{Direct HAPS\,$\rightarrow$\,UE SINR vs.\ the two UAV relay hops, as a function of HAPS\textendash UAV horizontal distance. The HAPS\,$\rightarrow$\,UAV feeder hop (orange) starts at $+29.3$\,dB at nadir and falls below the $+8$\,dB design floor (Eq.~\eqref{eq:sinr-min-design}) beyond $\approx45$\,km, crossing 0\,dB near 60\,km; the UAV\,$\rightarrow$\,UE access hop (green band, suburban\textendash high-rise range) stays well above it throughout.}
+\caption{Direct HAPS\,$\rightarrow$\,UE SINR (suburban, averaged in dB over 24 azimuths, including co-channel interference from the other two HAPS) vs.\ the two UAV relay hops, as a function of HAPS\textendash UAV horizontal distance. The HAPS\,$\rightarrow$\,UAV feeder hop (orange, including interference from the other HAPS, which is about 35\,dB below the noise floor) starts at $+37.6$\,dB at nadir and stays above $+22$\,dB at 100\,km, well above the $+8$\,dB design floor (Eq.~\eqref{eq:sinr-min-design}). The UAV\,$\rightarrow$\,UE access hop (green, suburban and high-rise identical at 500\,m) is $+33.4$\,dB. The direct link falls from $+7.3$\,dB at nadir to $-9.1$\,dB at 100\,km.}
 \label{fig:uav-relay-comparison}
 \end{figure}
 
-\noindent\textbf{Key finding: the feeder hop, not the access hop, bottlenecks this relay
-at long range, but is strongly positive near nadir.}
-Because the UAV hovers directly above the user it serves (\S II), its
-horizontal distance from the user is small and fixed while its horizontal
-distance from the serving HAPS grows with the user's own distance from the
-HAPS nadir. The UAV\,$\rightarrow$\,UE hop therefore stays strong
-($\mathrm{SINR}\approx+29$ to $+31$\,dB across all four landscapes,
-Table~\ref{table:app-uav-relay-comparison}) regardless of where the UAV is
-deployed. The HAPS\,$\rightarrow$\,UAV hop, by contrast, is a 38\,GHz slant
-path whose elevation angle falls with horizontal distance, so both free-space
-loss and the elevation-dependent ITU-P.618 scintillation margin
-(\S\ref{subsec:scintillation}) worsen together. Earlier revisions of this
-analysis evaluated that hop with $P_{\text{TX,HAPS}}$ only and \emph{no}
-antenna gain, which put the SINR below $-15$\,dB even at nadir -- physically
-unrealistic for a point-to-point Ka-band link, which is always closed with
-directional antennas rather than raw transmit power. Restoring the
-transmit/receive antenna-gain terms $G_h$, $G_u$ that the general SINR
-expression already calls for (\S III, Eq.~\eqref{eq:haps-uav-sinr}), using
-literature-typical gains for this class of link -- $G_h=13.8$\,dBi HAPS-side
-and $G_u=30.7$\,dBi UAV-side, matching a published 30\,GHz HAPS backhaul-class
-budget (Tx power 43.2\,dBm, essentially identical to
-$P_{\text{TX,HAPS}}=43$\,dBm used throughout this document) and a
-UAV-mountable mmWave patch-array antenna,
-respectively~\cite{karaman2025haps,anim2021uav} -- moves the HAPS\,$\rightarrow$\,UAV
-SINR to $+29.3$\,dB at nadir, clearing the $+8$\,dB design floor
-(Eq.~\eqref{eq:sinr-min-design}) out to $\approx45$\,km, staying positive out
-to $\approx60$\,km, and matching the direct link's $-5$\,dB floor out to
-$\approx70$\,km, before falling to $-20.6$\,dB at the 100\,km sweep edge as
-the elevation angle drops to $11.0^\circ$ and scintillation margin grows.
-Consequently $C_{\text{uav-relay}}$ now reaches
-$9.7$\,bits/s/Hz at nadir -- competitive with, and at some landscapes
-exceeding, the direct HAPS\,$\rightarrow$\,UE link's $1.9$--$6.2$\,bits/s/Hz
-over the same range (Table~\ref{table:app-uav-relay-comparison}) -- and
-collapses toward the UAV\,$\rightarrow$\,UE hop's ceiling only where the
-feeder hop's low elevation angle makes it the bottleneck. This quantifies
-the near-nadir placement guidance already noted for the relay UAV (\S II):
-the UAV relay is capacity-competitive with the direct link only within
-roughly the inner half of the service footprint, where its HAPS-facing
-feeder hop still clears the design SINR; beyond that, the direct link
-remains the better choice. The DQN association agent
-(\S\ref{sec:phase2-motivation}) does not currently route traffic through the
-UAV relay; extending its action space to do so conditionally (e.g.\ only
-within the feeder hop's viable range) is noted as future work in the
-Conclusion (\S\ref{sec:conclusion}).
+\noindent\textbf{Key finding: the relay outperforms the direct link at every distance,
+because co-channel interference from the other HAPS limits the direct service link.}
+The UAV hovers directly above the user it serves (\S II), so its horizontal distance
+from the user is small and fixed, while its distance from the serving HAPS grows with
+the user's own distance from the HAPS nadir. The UAV\,$\rightarrow$\,UE hop therefore stays
+at $\mathrm{SINR}\approx+33$\,dB regardless of where the UAV is deployed
+(Table~\ref{table:app-uav-relay-comparison}). The HAPS\,$\rightarrow$\,UAV hop is a 38\,GHz
+slant path with antenna gains $G_h=13.8$\,dBi (HAPS side) and $G_u=30.7$\,dBi (UAV side),
+matching a published 30\,GHz HAPS backhaul-class budget and a UAV-mountable mmWave
+patch-array antenna~\cite{karaman2025haps,anim2021uav}. Its SINR is $+37.6$\,dB at nadir and
+falls to $+22.6$\,dB at 100\,km as the elevation angle drops to $11^\circ$. Its interference
+term is about 35\,dB below the noise floor, so the hop is noise-limited. The direct
+HAPS\,$\rightarrow$\,UE link is different: it shares the 2\,GHz band with the other two HAPS, and its
+SINR falls from $+7.3$\,dB at nadir to $-9.1$\,dB at 100\,km. Its capacity therefore drops from
+$2.7$ to $0.2$\,bits/s/Hz. The relay's end-to-end capacity is $C_{\text{uav-relay}} = \min(C_{\text{haps-uav}}, C_{\text{uav-ue}})$:
+$11.1$\,bits/s/Hz at nadir, where the UAV\,$\rightarrow$\,UE access hop is the bottleneck, and $7.5$\,bits/s/Hz at 100\,km,
+where the feeder hop is the bottleneck (from about 30\,km outward). This result depends on two
+modelling choices: the 38\,GHz scintillation fade from the ITU-R P.618 table
+(about 0.2\,dB at zenith), and the ITU-R F.699 sidelobe envelope used for the interferers and the
+receive patterns (Section~III, interference model). The DQN association agent (\S\ref{sec:phase2-motivation}) does not route traffic through the
+UAV relay; adding the relay to its action space is noted as future work in the Conclusion (\S\ref{sec:conclusion}).
 
 \subsubsection{HAPS-to-UE Service Link}
 
@@ -982,7 +970,7 @@ Figure~\ref{fig:sinr-service-link} decomposes this along one representative dire
 \label{fig:sinr-service-link}
 \end{figure}
 
-Figure~\ref{fig:sinr-feeder-link} shows the 38~GHz backhaul-link SINR for gateway offsets of 10--500~m from nadir (gateway at 50\,m altitude, HAPS at nominal stratospheric altitude), including the HAPS-side and Gateway-side antenna gains of \S\ref{subsec:backhaul-geometry} ($G_h=13.8$\,dBi, $G_g=39.7$\,dBi). The backhaul slant range is set by the HAPS altitude ($\sim$20\,km), against which a 10--500\,m horizontal offset is negligible, so SINR is essentially flat at $\approx+38.0$--$38.1$\,dB across this range -- strongly positive once the directional antenna gains are included, versus the deeply negative result obtained when the link budget used raw transmit power alone (\S\ref{subsec:backhaul-geometry}). The interfering HAPS, by contrast, sit at a slant range of $\sim$65--68\,km (equilateral-triangle geometry, \S III.A); the resulting interference power is $\approx-43$\,dB below the noise floor. The backhaul link is therefore \textbf{noise-limited, not interference-limited}, unlike the service link.
+Figure~\ref{fig:sinr-feeder-link} shows the 38~GHz backhaul-link SINR for gateway offsets of 10--500~m from nadir (gateway at 50\,m altitude, HAPS at nominal stratospheric altitude), including the HAPS-side and Gateway-side antenna gains of \S\ref{subsec:backhaul-geometry} ($G_h=13.8$\,dBi, $G_g=39.7$\,dBi). The backhaul slant range is set by the HAPS altitude ($\sim$20\,km), against which a 10--500\,m horizontal offset is negligible, so SINR is essentially flat at $\approx+38.0$--$38.1$\,dB across this range -- strongly positive once the directional antenna gains are included, versus the deeply negative result obtained when the link budget used raw transmit power alone (\S\ref{subsec:backhaul-geometry}). The interfering HAPS, by contrast, sit at a slant range of $\sim$65--68\,km (equilateral-triangle geometry, \S III.A); the resulting interference power is $\approx-35$\,dB below the noise floor. This assumes that each interferer's main beam points at its own service area, so the gateway sees it through the sidelobe envelope of ITU-R F.699 (floored at $-10$\,dBi), and that the gateway dish is off-boresight by about $73^\circ$ toward the interferer, so its gain there is also the $-10$\,dBi floor. The backhaul link is therefore \textbf{noise-limited, not interference-limited}, unlike the service link.
 
 \begin{figure}[h!]\centering
 \includegraphics[width=0.95\columnwidth]{./figures/haps_feeder_link_38ghz.png}
@@ -1074,17 +1062,17 @@ further on this closed-form baseline.
 \section{LSTM and DRL for User--Platform Association}
 % =====================================================================
 
-This section combines two learned components for dynamic user-to-platform association in the HAPS--UAV--Gateway network. An LSTM forecasts the feeder rain attenuation over the next six hours from past weather, and a Deep Q-Network (DQN) agent uses that forecast to choose each user's platform, maximizing throughput, fairness, and energy efficiency. Whereas Phase~1 characterized static link quality, this section learns real-time association decisions.
+This section combines two learned components for dynamic user-to-platform association in the HAPS--UAV--Gateway network. An LSTM forecasts the feeder rain attenuation up to six hours ahead from past weather, and a Deep Q-Network (DQN) agent uses its one-hour-ahead forecast to choose each user's platform, maximizing throughput, fairness, and energy efficiency. Whereas Phase~1 characterized static link quality, this section learns real-time association decisions.
 
 \subsection{LSTM Rain-Attenuation Forecaster}
 \label{sec:lstm}
 
-\paragraph{Why an LSTM is needed.} The DQN chooses an association at each hour $t$, before that hour's rain is observed. Re-associating users takes time, so the controller benefits from knowing the feeder loss a few hours ahead, not only for the next hour. A six-hour horizon is a design choice for that lead time; the results below show its accuracy and do not claim that it improves the one-hour forecast. The feeder loss for hours $t{+}1$ to $t{+}6$ is therefore unknown at decision time. The ITU-R P.618 attenuation~\cite{itu_p618} can be evaluated only for hours already observed, so the agent needs a forecast of it. A long short-term memory (LSTM) network learns the mapping from the recent weather history to the next six hourly attenuation values. Persistence, which repeats the last observed value, is the benchmark the forecast must beat to justify its use.
+\paragraph{Why an LSTM is needed.} The DQN chooses an association at each hour $t$, before that hour's rain is observed. The ITU-R P.618 attenuation~\cite{itu_p618} can be evaluated only for hours already observed, so the agent needs a forecast of the feeder loss for hour $t$. A long short-term memory (LSTM) network learns the mapping from the recent weather history to the next six hourly attenuation values, and the results below report its accuracy at each horizon. The agent uses only the one-hour-ahead output (the forecast for hour $t$, issued at hour $t{-}1$); the longer horizons are reported to show the forecast's skill, not as an input to the DQN. Persistence, which repeats the last observed value, is the benchmark the forecast must beat to justify its use.
 
 \paragraph{How it is used.} The pipeline has four steps:
 \begin{enumerate}
 \item \textbf{Data preparation.} Hourly NASA POWER and METAR observations and ERA5 cloud fields for Delhi (2023--2026) are merged on UTC hours. The 14 input features are temperature, humidity, pressure, wind, precipitation, cloud amount, visibility, rain and fog codes, cloud liquid water, and sine and cosine encodings of time of day and season.
-\item \textbf{Target.} For each hour, the target is the ITU-R P.618 path attenuation at $38.0$\,GHz and $11.3^\circ$ elevation, computed from the observed precipitation.
+\item \textbf{Target.} For each hour, the target is the rain attenuation on the HAPS-to-gateway path at $38.0$\,GHz and $89.86^\circ$ elevation, from the observed precipitation: $\gamma_R$ from ITU-R P.838 at the hourly rate, multiplied by the slant length through the rain layer (P.839 rain height of $5.28$\,km at Delhi) and the P.618 path reduction factor. The same model gives the DQN's rain loss (Section~\ref{sec:dqn-results}).
 \item \textbf{Windows.} Each sample uses the past 24 hours of features and predicts the next six hourly targets.
 \item \textbf{Rolling episodes.} The DQN is trained on $400$ rolling 24-hour episodes drawn from 2024, each starting at a distinct hour. At every hour of an episode, the LSTM forecast from the preceding 24 hours is supplied as the state feature.
 \end{enumerate}
@@ -1093,34 +1081,34 @@ Forecasts are always out of sample. The 2024 forecasts come from a model trained
 
 \begin{table}[t]
 \centering
-\caption{LSTM against persistence on the full 2026 record: mean absolute error (MAE) and root-mean-square error (RMSE), in dB, per forecast horizon.}
+\caption{LSTM against persistence on 2026 (6557 forecast hours, no 2026 data in training): mean absolute error (MAE) and root-mean-square error (RMSE), in dB, per forecast horizon. Bold marks the better method for each measure and horizon.}
 \label{tab:lstm-2026}
 {\scriptsize\setlength{\tabcolsep}{3pt}
 \begin{tabularx}{\columnwidth}{|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
 \hline
 \textbf{Horizon} & \textbf{LSTM MAE} & \textbf{Persistence MAE} & \textbf{LSTM RMSE} & \textbf{Persistence RMSE} \\
 \hline
-$+1$\,h & $0.91$ & $\mathbf{0.65}$ & $2.92$ & $\mathbf{2.44}$ \\
+$+1$\,h & $0.20$ & $\mathbf{0.12}$ & $0.65$ & $\mathbf{0.53}$ \\
 \hline
-$+2$\,h & $1.25$ & $1.09$ & $3.82$ & $3.55$ \\
+$+2$\,h & $0.27$ & $\mathbf{0.20}$ & $0.86$ & $\mathbf{0.75}$ \\
 \hline
-$+3$\,h & $1.49$ & $1.41$ & $4.43$ & $4.30$ \\
+$+3$\,h & $0.31$ & $\mathbf{0.26}$ & $0.96$ & $\mathbf{0.90}$ \\
 \hline
-$+4$\,h & $1.61$ & $1.63$ & $4.78$ & $4.87$ \\
+$+4$\,h & $0.33$ & $\mathbf{0.30}$ & $\mathbf{1.00}$ & $1.02$ \\
 \hline
-$+5$\,h & $\mathbf{1.68}$ & $1.81$ & $\mathbf{4.95}$ & $5.29$ \\
+$+5$\,h & $0.34$ & $0.34$ & $\mathbf{1.00}$ & $1.11$ \\
 \hline
-$+6$\,h & $\mathbf{1.71}$ & $1.95$ & $\mathbf{5.01}$ & $5.61$ \\
+$+6$\,h & $\mathbf{0.35}$ & $0.36$ & $\mathbf{1.02}$ & $1.17$ \\
 \hline
 \end{tabularx}}
 \end{table}
 
-\paragraph{Reading the validation.} At $+1$\,h, persistence is more accurate on average. From $+4$\,h the LSTM is slightly better on both measures, by about $0.1$\,dB. In rain hours, persistence is more accurate at every horizon, so the forecast adds value mainly for longer horizons and in dry or light-rain periods. Each method forecasts every hour of 2026, and the errors are averaged per horizon over the full year. Persistence serves as the benchmark only; the DQN uses the LSTM forecast at every hour.
+\paragraph{Reading the validation.} Persistence is more accurate at $+1$ to $+3$\,h on both measures. At $+4$\,h the LSTM has the lower RMSE, and at $+5$ and $+6$\,h it matches or beats persistence on MAE and RMSE. The gain over persistence is therefore modest and confined to the longer horizons. In rain hours (1248 of the 6557 forecasts) the LSTM is less accurate than persistence at $+1$\,h (MAE $0.71$ against $0.51$\,dB). Each method forecasts every hour of 2026, and the errors are averaged per horizon over the year. Persistence serves as the benchmark only. The DQN uses the one-hour-ahead forecast at every hour. Improving the forecast with current observations from neighbouring regions is future work.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{./figures/lstm_forecast_2026.png}
-\caption{Real, LSTM, persistence and PreLSTM over a 300-hour window in July 2026, the window with the most rain. Real: observed ITU-R P.618 attenuation from downloaded precipitation. LSTM: one-hour-ahead forecast. Persistence: previous hour's value. PreLSTM: random hourly rain rates drawn from the ITU-R P.837 statistics for Delhi, converted with P.618; this is a synthetic baseline with no observed data. Star and open markers show the 301st hour.}
+\caption{Real, LSTM, persistence and PreLSTM over a 300-hour window in July 2026, the window with the most rain. Real: observed hourly attenuation from the downloaded precipitation (P.838 and P.618 method, gateway geometry). LSTM: one-hour-ahead forecast. Persistence: previous hour's value. PreLSTM: random hourly rain rates drawn from the ITU-R P.837 statistics for Delhi, converted with P.618; this is a synthetic baseline with no observed data. Star and open markers show the 301st hour.}
 \label{fig:lstm-2026}
 \end{figure}
 
@@ -1164,13 +1152,13 @@ The state vector for user~$k$ is 12-dimensional:
 
 \noindent \textbf{DQN Scope} (scintillation deferred to future work):
 \begin{itemize}\setlength{\itemsep}{0pt}
-  \item \textbf{Included}: Deterministic SINR from constellation geometry (Phase~1); rainfall \& visibility for backhaul margin planning; battery state for load balancing
+  \item \textbf{Included}: Deterministic SINR from constellation geometry (Phase~1); rainfall \& visibility for backhaul fade planning; battery state for load balancing
   \item \textbf{NOT included}: Tropospheric scintillation fading (Section~\ref{subsec:scintillation}) --- time-varying random process requiring LSTM forecasting (future work)
-  \item \textbf{Approximation}: the DQN assumes worst-case static fading margin ($3.65$~dB service, $10.53$~dB backhaul at $p=1\%$) or uses Phase~1 fade-depth statistics as penalty modulation
-  \item \textbf{LSTM forecaster}: predicts rain attenuation six hours ahead from past weather (Section~\ref{sec:lstm}); forecasting scintillation fading, which would enable adaptive margin reallocation, is future work
+  \item \textbf{Approximation}: the DQN does not model scintillation; the P.618 fade at $p=1\%$ is $0.04$~dB at 2.1\,GHz and $0.6$~dB at 38\,GHz (Section~\ref{subsec:scintillation}), which is not a DQN input
+  \item \textbf{LSTM forecaster}: predicts rain attenuation up to six hours ahead from past weather, of which only the one-hour-ahead output is used by the agent (Section~\ref{sec:lstm}); forecasting scintillation fading, which would enable adaptive fade reallocation, is future work
 \end{itemize}
 
-\textbf{Validation:} Phase~1 measured SINR $\in [-11.27, +7.25]$~dB across the full 10--100~km, 24-point angular sweep (worst case at $r=75$\,km, $\theta=0^\circ$; best case at $r=10$\,km, $\theta=210^\circ$; Figure~\ref{fig:multinode-interference} and underlying spatial sweep data). Bounds $[-20, +30]$~dB provide an $8.7$\,dB margin on the low side and a $22.8$\,dB margin on the high side for edge cases (atmospheric fading, relay paths in v2).
+\textbf{Validation:} Phase~1 measured SINR $\in [-11.27, +7.25]$~dB across the full 10--100~km, 24-point angular sweep (worst case at $r=75$\,km, $\theta=0^\circ$; best case at $r=10$\,km, $\theta=210^\circ$; Figure~\ref{fig:multinode-interference} and underlying spatial sweep data). Bounds $[-20, +30]$~dB lie $8.7$\,dB below and $22.8$\,dB above the observed range, for edge cases (atmospheric fading, relay paths in v2).
 
 \subsubsection{Action Space}
 
@@ -1305,9 +1293,7 @@ Independent of landscape, adding multi-HAPS co-channel interference degrades the
 \noindent \textbf{Backhaul link (38 GHz) does NOT experience this penalty}: The three interfering HAPS are $\approx 65$ km from the ground Gateway, placing them far outside the 10--500 m backhaul coverage. Consequently, interference from constellation members remains well below thermal noise floor; backhaul SINR is primarily noise-limited and approximately constant at $+38$~dB, once the HAPS/Gateway directional antenna gains (\S\ref{subsec:backhaul-geometry}) are included in the link budget (Eq.~\eqref{eq:feeder-sinr},Figure~\ref{fig:sinr-feeder-link}).
 
 \paragraph{Scintillation fading (ITU P.618 implementation).}
-Figure~\ref{fig:scint_fade_depth} introduces a physics-based model of tropospheric scintillation affecting both service links (UE $\leftrightarrow$ HAPS, 5$^\circ$--85$^\circ$ elevation-dependent) and backhaul links (HAPS $\leftrightarrow$ Gateway, 25$^\circ$--45$^\circ$ fixed). The fade-depth model
-\eqref{eq:scint_fade} accounts for frequency scaling ($\propto f^{0.7}$), elevation scaling
-($\propto 1/\sin(\theta)$), and time-percentage statistics ($\propto \sqrt{\log(1/p)}$), directly from ITU-R P.618-13. Two distribution models (log-normal and Gamma) enable exploration of fading assumptions. Typical S-band (2~GHz) margins range 2.6--4.7\,dB across the 0.1\%--10\% time-percentage range, while Ka-band (38~GHz) margins range 7.6--13.1\,dB, reflecting the frequency dependence of tropospheric turbulence.
+Figure~\ref{fig:scint_fade_depth} shows the ITU-R P.618 scintillation fade for the 38\,GHz gateway link and the 2.1\,GHz UE link. Over $p=0.01$--$10$\,\% and $10^\circ$--$90^\circ$ elevation, the fade is 0.04--1.8\,dB at 38\,GHz and 0.007--0.3\,dB at 2.1\,GHz. The 38\,GHz fade is about 0.2\,dB at zenith and 1.8\,dB at $10^\circ$ for $p=0.01$\,\%. These values replace the earlier empirical fit and its S-band (2.6--4.7\,dB) and Ka-band (7.6--13.1\,dB) fade values, which were not reproducible from P.618.
 
 \noindent\textbf{Key Findings:}
 \begin{itemize}
@@ -1320,26 +1306,26 @@ Figure~\ref{fig:scint_fade_depth} introduces a physics-based model of tropospher
 \subsection{DQN Results}
 \label{sec:dqn-results}
 
-The DQN is trained on $400$ rolling 24-hour episodes drawn from 2024 and evaluated on $50$ calendar days from 2025, which are never seen during training. Each training episode carries the real hourly rain, visibility, and time of day, the ITU-R P.618 rain loss, and the LSTM one-hour-ahead forecast (Section~\ref{sec:lstm}). The same $50$ days are used for every baseline. Results are reported over five training seeds: Table~\ref{tab:dqn-all-policies} compares all policies, Table~\ref{tab:dqn-seed-stats} gives the seed-level statistics, Table~\ref{tab:dqn-paired} gives the paired comparison with the strongest baseline, and Figure~\ref{fig:policy-comparison} shows the comparison graphically.
+The DQN is trained on $400$ rolling 24-hour episodes drawn from 2024 and evaluated on $50$ calendar days from 2025, which are never seen during training. Each training episode carries the real hourly rain, visibility, and time of day, the ITU-R P.618 rain loss, and the LSTM one-hour-ahead forecast (Section~\ref{sec:lstm}). Each baseline is evaluated on the same $50$ days for each seed, and the random and max-SINR baselines use the same evaluation seeds as the DQN. Results are reported over five training seeds: Table~\ref{tab:dqn-all-policies} compares all policies, Table~\ref{tab:dqn-seed-stats} gives the seed-level statistics, Table~\ref{tab:dqn-paired} gives the paired comparison with the strongest baseline, and Figure~\ref{fig:policy-comparison} shows the comparison graphically.
 
 \begin{table}[t]
 \centering
-\caption{Policy comparison on the 50 held-out 2025 days. DQN values are means over five seeds; baselines are means over the 50 days (standard deviation in brackets).}
+\caption{Policy comparison on the 50 held-out 2025 days. All values are means over five seeds (standard deviation across seeds in brackets).}
 \label{tab:dqn-all-policies}
 {\scriptsize\setlength{\tabcolsep}{3pt}
 \begin{tabularx}{\columnwidth}{|>{\raggedright\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
 \hline
 \textbf{Policy} & \textbf{Reward per step} & \textbf{Jain} & \textbf{Outage /50} \\
 \hline
-Phase 1 random (real weather) & $-51.0\,(8.9)$ & $0.071\,(0.048)$ & $19.4\,(3.6)$ \\
+Random (real weather) & $-49.1\,(1.7)$ & $0.080\,(0.008)$ & $20.2\,(0.4)$ \\
 \hline
-Phase 1 max-SINR (real weather) & $-16.5\,(8.0)$ & $\mathbf{0.694}\,(0.030)$ & $1.0\,(1.1)$ \\
+Max-SINR (real weather) & $-14.5\,(2.1)$ & $\mathbf{0.696}\,(0.003)$ & $0.9\,(0.2)$ \\
 \hline
-PreLSTM random (synthetic weather) & $-50.6\,(8.6)$ & $0.077\,(0.045)$ & $20.9\,(3.6)$ \\
+Random (PreLSTM, synthetic weather) & $-49.1\,(1.7)$ & $0.080\,(0.008)$ & $20.2\,(0.4)$ \\
 \hline
-PreLSTM max-SINR (synthetic weather) & $-16.5\,(8.0)$ & $\mathbf{0.694}\,(0.030)$ & $1.0\,(1.1)$ \\
+Max-SINR (PreLSTM, synthetic weather) & $-14.4\,(2.1)$ & $\mathbf{0.696}\,(0.003)$ & $0.9\,(0.2)$ \\
 \hline
-\textbf{LSTM + DQN (real weather)} & $\mathbf{-5.2}\,(1.6)$ & $0.110\,(0.054)$ & $\mathbf{0.0}\,(0.0)$ \\
+\textbf{LSTM + DQN (real weather)} & $\mathbf{-5.1}\,(1.1)$ & $0.098\,(0.036)$ & $\mathbf{0.0}\,(0.0)$ \\
 \hline
 \end{tabularx}}
 \end{table}
@@ -1353,13 +1339,13 @@ PreLSTM max-SINR (synthetic weather) & $-16.5\,(8.0)$ & $\mathbf{0.694}\,(0.030)
 \hline
 \textbf{Metric} & \textbf{Mean $\pm$ std} & \textbf{Median} & \textbf{Range} & \textbf{95\% CI} \\
 \hline
-Reward per step & $-5.18\pm1.62$ & $-5.02$ & $[-7.51,\,-3.58]$ & $[-7.19,\,-3.16]$ \\
+Reward per step & $-5.11\pm1.05$ & $-5.06$ & $[-6.64,\,-3.67]$ & $[-6.41,\,-3.80]$ \\
 \hline
-Jain fairness & $0.110\pm0.054$ & $0.083$ & $[0.070,\,0.201]$ & $[0.043,\,0.177]$ \\
+Jain fairness & $0.098\pm0.036$ & $0.084$ & $[0.062,\,0.146]$ & $[0.054,\,0.143]$ \\
 \hline
 Outage /50 & $0.0\pm0.0$ & $0.0$ & $[0,\,0]$ & $[0,\,0]$ \\
 \hline
-Battery SoC (\%) & $59.9\pm0.6$ & $59.9$ & $[59.1,\,60.5]$ & $[59.2,\,60.6]$ \\
+Battery SoC (\%) & $59.95\pm0.58$ & $59.89$ & $[59.09,\,60.52]$ & $[59.24,\,60.67]$ \\
 \hline
 \end{tabularx}}
 \end{table}
@@ -1373,13 +1359,13 @@ Battery SoC (\%) & $59.9\pm0.6$ & $59.9$ & $[59.1,\,60.5]$ & $[59.2,\,60.6]$ \\
 \hline
 \textbf{Metric} & \textbf{Mean difference} & \textbf{95\% CI} & \textbf{$p$-value} & \textbf{Seeds} \\
 \hline
-Reward per step & $+9.33$ & $[+7.82,\,+10.84]$ & $0.0001$ & $5/5$ \\
+Reward per step & $+9.36$ & $[+7.80,\,+10.91]$ & $0.0001$ & $5/5$ \\
 \hline
 Outage /50 & $-0.87$ & $[-1.13,\,-0.61]$ & $0.0007$ & $5/5$ \\
 \hline
-Jain fairness & $-0.59$ & $[-0.65,\,-0.52]$ & $<0.0001$ & $0/5$ \\
+Jain fairness & $-0.60$ & $[-0.64,\,-0.56]$ & $<0.0001$ & $0/5$ \\
 \hline
-Battery SoC (\%) & $-0.001$ & $[-0.04,\,0.04]$ & $0.95$ & $1/5$ \\
+Battery SoC (\%) & $+0.02$ & $[-0.05,\,+0.09]$ & $0.43$ & $4/5$ \\
 \hline
 \end{tabularx}}
 \end{table}
@@ -1387,17 +1373,17 @@ Battery SoC (\%) & $-0.001$ & $[-0.04,\,0.04]$ & $0.95$ & $1/5$ \\
 \begin{figure*}[t]
 \centering
 \includegraphics[width=\textwidth]{./figures/policy_comparison.png}
-\caption{Five-policy comparison on the 50 held-out 2025 days: reward per step (higher is better), Jain fairness (higher is better), and outage users of 50 (lower is better). Bars are means; error bars are one standard deviation.}
+\caption{Policy comparison on the 50 held-out 2025 days over five seeds: reward per step (higher is better), Jain fairness (higher is better), and outage users of 50 (lower is better). Bars are means over seeds; error bars are one standard deviation across seeds.}
 \label{fig:policy-comparison}
 \end{figure*}
 
-\paragraph{Reward and outage.} LSTM + DQN achieves the highest reward and the lowest outage. Its mean reward is $-5.2$ against $-16.5$ for max-SINR, and its outage is zero against $1.0$ user. These differences hold in all five seeds (Table~\ref{tab:dqn-paired}).
+\paragraph{Reward and outage.} LSTM + DQN has the highest mean reward and no outage. Its mean reward is $-5.1$ against $-14.5$ for max-SINR, and its outage is zero against $0.9$ users on average. Both differences hold on every seed (Table~\ref{tab:dqn-paired}).
 
-\paragraph{Fairness.} Max-SINR is fairer in every seed. Its Jain index is $0.69$ against $0.11$ for LSTM + DQN. The learned policy routes most users through a small set of relay options, which raises the reward's throughput term but concentrates service on few users. The reward therefore favours throughput, and the paper's objective should weight fairness more if equal service is required.
+\paragraph{Fairness.} Max-SINR is fairer on every seed. Its Jain index is $0.70$ against $0.10$ for LSTM + DQN. Under the current reward weights (0.5 for throughput, 0.3 for fairness), the learned policy concentrates service on fewer users; a fairness-aware reward is future work.
 
-\paragraph{Baselines and weather.} Random association is worst on every metric. The synthetic-weather runs (PreLSTM) and the real-weather runs give almost identical results for the baselines, because the rain loss enters the reward only through the throughput term, which is small for direct links.
+\paragraph{Baselines and weather.} Random association is worst on every metric. The real-weather and PreLSTM baselines agree to within $0.1$ in reward, because the rain loss enters the reward only through the throughput term, and that term is small for the direct links.
 
-\paragraph{Limitation.} The DQN's relay options are modelled per HAPS, while the topology has a single ground gateway serving the network; the relay capacity therefore does not yet include sharing of that gateway. The fairness and relay-routing results should be read with this in mind.
+\paragraph{Limitation.} The DQN chooses among the three HAPS only; UAV relay routing is not in its action space. The topology has a single ground gateway serving the network, and sharing of that gateway is not modelled. The fairness results should be read with this in mind.
 
 % =====================================================================
 \section{Conclusion}
@@ -1417,43 +1403,34 @@ dominates service-link quality: a 9.94\,dB spread at a fixed 50\,km radius
 (\S\ref{sec:phase1-summary}) exceeds the degradation from doubling distance.
 The backhaul link remains noise-limited and largely unaffected by constellation
 geometry, while scintillation adds a frequency- and elevation-dependent
-margin on both links (\S\ref{subsec:scintillation}).
+fade on both links (\S\ref{subsec:scintillation}).
 
 \paragraph{Relay path analysis.} The topology's actual relay route,
 HAPS$\rightarrow$UAV$\rightarrow$UE (\S\ref{sec:relay-path-analysis}), was
-evaluated as an alternative to the direct service link. For the UAV relay, the access hop (UAV$\rightarrow$UE) is
-consistently strong ($+29$ to $+31$\,dB SINR) because the UAV hovers close to
-the user it serves, while the feeder hop (HAPS$\rightarrow$UAV) is a
-38\,GHz slant path whose SINR falls with distance as elevation angle drops
-and the ITU-P.618 scintillation margin grows. With available
-antenna gains on this hop ($G_h=13.8$\,dBi HAPS-side,
-$G_u=30.7$\,dBi UAV-side~\cite{karaman2025haps,anim2021uav}, SINR starts at
-$+29.3$\,dB at nadir and clears the $+8$\,dB design floor
-(Eq.~\eqref{eq:sinr-min-design}, derived from the 16-QAM/CQI-7 minimum-MCS
-SINR at 10\% BLER~\cite{3gpp_ts38214} plus a 3\,dB margin) out to
-$\approx45$\,km, before falling below the direct link's own $-5$\,dB floor
-beyond $\approx70$\,km as the path approaches the 100\,km sweep edge
-($11.0^\circ$ elevation). The decode-and-forward end-to-end capacity
-therefore reaches $9.7$\,bits/s/Hz at nadir, competitive with the direct
-link's $1.9$--$6.2$\,bits/s/Hz over the same range (Table~\ref{table:app-uav-relay-comparison}).
-The relay is thus capacity-competitive with the direct link
-within roughly the inner $\approx45$--$60$\,km of HAPS nadir, but not
-beyond.
+evaluated as an alternative to the direct service link. The access hop (UAV$\rightarrow$UE) is
+$\approx+33$\,dB SINR at 500\,m because the UAV hovers close to the user it serves. The feeder hop
+(HAPS$\rightarrow$UAV, 38\,GHz) has antenna gains $G_h=13.8$\,dBi and $G_u=30.7$\,dBi
+(\cite{karaman2025haps,anim2021uav}); its SINR is $+37.6$\,dB at nadir and $+22.6$\,dB at 100\,km, well above the
+$+8$\,dB design floor (Eq.~\eqref{eq:sinr-min-design}, derived from the 16-QAM/CQI-7 minimum-MCS SINR at 10\% BLER~\cite{3gpp_ts38214}
+plus a 3\,dB margin). The direct HAPS$\rightarrow$UE link, which shares the 2\,GHz band with the other two HAPS, falls from
+$+7.3$\,dB to $-9.1$\,dB. The decode-and-forward end-to-end capacity is $11.1$\,bits/s/Hz at nadir and $7.5$\,bits/s/Hz at 100\,km,
+against the direct link's $2.7$ and $0.2$\,bits/s/Hz (Table~\ref{table:app-uav-relay-comparison}). The relay therefore outperforms
+the direct link at every distance in this model.
 DQN association agent (\S\ref{sec:phase2-motivation}) therefore
-restricts its action space to the three direct HAPS choices and does not 
+restricts its action space to the three direct HAPS choices and does not
 route through the UAV relay, and is left for future work.
 
 \paragraph{Learned association.} Neither policy dominates: LSTM-fed DQN has the higher reward and lower outage, while max-SINR is fairer. Max-SINR assumes the SINR to every platform is known at decision time, which a deployed system must measure. The LSTM-fed DQN agent (\S\ref{sec:dqn-results})
 earns the highest reward and the lowest outage of all policies tested on the
-held-out 2025 days (mean reward $-5.2$ vs.\ $-16.5$ for max-SINR, outage $0$ vs.\
-$1.0$ users out of 50), with the reward and outage advantage holding in all five
-training seeds. Max-SINR remains fairer (Jain index $0.69$ vs.\ $0.11$), so the
+held-out 2025 days (mean reward $-5.1$ vs.\ $-14.5$ for max-SINR, outage $0$ vs.\
+$0.9$ users out of 50 on average), with the reward and outage advantage holding in all five
+training seeds. Max-SINR remains fairer (Jain index $0.70$ vs.\ $0.10$), so the
 learned policy trades fairness for throughput under the current reward. Two
 directions for future work follow: (1) adding a fairness-aware reward or
 constraint to close the fairness gap, and testing on harder (e.g.\ rain- or
 mobility-heavy) scenarios, and (2) extending the DQN's action space to include UAV relay
-routing alongside direct association -- now that the feeder hop is
-capacity-competitive within $\approx45$--$60$\,km of nadir -- so the learned
+routing alongside direct association -- now that the relay outperforms the direct link at every
+distance in this model -- so the learned
 policy, rather than a fixed three-way choice, decides when relaying is
 worthwhile as a function of user distance.
 

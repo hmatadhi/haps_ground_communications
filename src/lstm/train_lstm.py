@@ -22,8 +22,6 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import xarray as xr
-from itur.models.itu618 import rain_attenuation as p618_rain_attenuation
-
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 BASE_CSV = os.path.join(ROOT, "data", "processed", "delhi_hourly_TEMP.csv")
 ERA5_DIR = os.path.join(ROOT, "data", "raw", "era5")
@@ -33,29 +31,33 @@ MODEL_DIR = os.path.join(ROOT, "models", "lstm")
 SITE_LAT, SITE_LON = 28.61, 77.21
 ERA5_LAT, ERA5_LON = 28.50, 77.25
 FREQ_GHZ = 38.0
-ELEV_DEG = 11.3          # worst-case feeder elevation from the paper
+ELEV_DEG = 89.86         # HAPS (20 km) to gateway, near zenith (gateway geometry)
 GATEWAY_KM = 0.05        # ground gateway height (50 m)
-
-_path_cache: dict[float, float] = {}
+K_RAIN, ALPHA_RAIN = 0.3923, 0.8687   # P.838, 38 GHz, 89.86 deg (itur)
+H_RAIN_KM = 5.278                     # P.839 rain height, Delhi (itur)
 
 
 def rain_path_attenuation_db(rain_mm_h: np.ndarray) -> np.ndarray:
-    """ITU-R P.618 path rain attenuation (dB) for each hourly rain rate.
+    """Hourly rain attenuation (dB) on the HAPS-to-gateway path, ITU-R P.838 + P.618.
 
-    The P.618 path runs from the gateway up to the rain height (P.839, 5.28 km at Delhi),
-    so the path length comes from itur, not from a fixed constant. Results are cached by rate.
+    gamma_R = K_RAIN * R^ALPHA_RAIN [dB/km] (P.838, 38 GHz, 89.86 deg, horizontal pol.)
+    L_s = (H_RAIN - h_gw) / sin(theta)            slant length through rain (P.618)
+    r   = 1 / (1 + 0.78 sqrt(L_G gamma) - 0.38 (1 - exp(-2 L_G)))   P.618 reduction factor
+    A   = gamma * L_s * r
+
+    Same constants and formula as feeder_link_rain_effect_on_capacity() in
+    src/models/battery_model.py, so the LSTM label and the DQN rain loss agree.
+    Note: the input is the hourly rain rate itself (not the 0.01 % rate).
     """
-    out = np.zeros(len(rain_mm_h))
-    for i, rate in enumerate(np.round(rain_mm_h, 2)):
-        if rate not in _path_cache:
-            if rate <= 0:
-                _path_cache[rate] = 0.0
-            else:
-                a = p618_rain_attenuation(SITE_LAT, SITE_LON, FREQ_GHZ, ELEV_DEG,
-                                          hs=GATEWAY_KM, p=0.01, R001=float(rate))
-                _path_cache[rate] = float(np.asarray(getattr(a, "value", a)).ravel()[0])
-        out[i] = _path_cache[rate]
-    return out
+    rain = np.nan_to_num(np.asarray(rain_mm_h, dtype=float), nan=0.0)
+    rain = np.clip(rain, 0.0, None)
+    sin_t = np.sin(np.radians(ELEV_DEG))
+    cos_t = np.cos(np.radians(ELEV_DEG))
+    slant_km = (H_RAIN_KM - GATEWAY_KM) / sin_t
+    horiz_km = slant_km * cos_t
+    gamma = K_RAIN * rain ** ALPHA_RAIN
+    r = 1.0 / (1.0 + 0.78 * np.sqrt(horiz_km * gamma) - 0.38 * (1.0 - np.exp(-2.0 * horiz_km)))
+    return np.where(rain > 0, gamma * slant_km * r, 0.0)
 
 FEATURES = [
     "t2m_c", "rh2m_pct", "ps_kpa", "ws10m_ms", "precip_mmh", "cloud_amt_pct",

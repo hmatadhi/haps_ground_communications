@@ -7,7 +7,7 @@ Sensitivity checks for the propagation parameters still in the model, using itur
 2. Rain: itur path attenuation (P.618) against the paper's environment model
    (k*R^alpha over 66.3 km, in haps_association_env / battery_model) and the paper's worked
    example.
-3. Specific attenuation: itur P.838 gamma_R against the paper's k = 0.0315, alpha = 0.921.
+3. Specific attenuation: itur P.838 gamma_R against the paper's k = 0.3923, alpha = 0.8687 (89.86 deg).
 
 Output: data/processed/parameter_analysis/parameter_sensitivity.csv
 
@@ -28,7 +28,18 @@ GATEWAY_KM = 0.05
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 OUT_DIR = os.path.join(ROOT, "data", "processed", "parameter_analysis")
 
-PAPER_K, PAPER_ALPHA, PAPER_PATH_KM = 0.0315, 0.921, 102.0 * 0.65  # paper's environment model
+PAPER_K, PAPER_ALPHA = 0.3923, 0.8687          # P.838, 38 GHz, 89.86 deg (gateway geometry)
+PAPER_H_RAIN_KM, PAPER_H_GW_KM, PAPER_ELEV_DEG = 5.278, 0.05, 89.86   # P.839 rain height, gateway
+
+
+def paper_rain_db(rate):
+    """Rain attenuation of the paper's model: gamma_R * L_s * r (P.618 reduction factor)."""
+    gamma = PAPER_K * rate ** PAPER_ALPHA
+    sin_t, cos_t = np.sin(np.radians(PAPER_ELEV_DEG)), np.cos(np.radians(PAPER_ELEV_DEG))
+    l_s = (PAPER_H_RAIN_KM - PAPER_H_GW_KM) / sin_t
+    l_g = l_s * cos_t
+    r = 1.0 / (1.0 + 0.78 * np.sqrt(l_g * gamma) - 0.38 * (1.0 - np.exp(-2.0 * l_g)))
+    return gamma * l_s * r
 
 
 def scalar(x) -> float:
@@ -70,13 +81,13 @@ def main() -> None:
 
     for rate in [1.0, 10.0, 25.0]:
         gamma = scalar(rain_specific_attenuation(rate, FREQ_GHZ, ELEV_DEG, 0))
-        paper_env = PAPER_K * rate ** PAPER_ALPHA * PAPER_PATH_KM
+        paper_env = paper_rain_db(rate)
         path = scalar(rain_attenuation(SITE_LAT, SITE_LON, FREQ_GHZ, ELEV_DEG,
                                        hs=GATEWAY_KM, p=0.01, R001=rate))
         rows.append({"check": f"rain {rate:g} mm/h: P.618 path (itur)", "value_db": path})
         rows.append({"check": f"rain {rate:g} mm/h: gamma_R (itur, dB/km)", "value_db": gamma})
         rows.append({"check": f"rain {rate:g} mm/h: paper env model", "value_db": paper_env})
-    rows.append({"check": "rain 10 mm/h: paper worked example", "value_db": 5.9})
+    rows.append({"check": "rain 10 mm/h: paper worked example", "value_db": paper_rain_db(10.0)})
 
     out = pd.DataFrame(rows)
     out.to_csv(os.path.join(OUT_DIR, "parameter_sensitivity.csv"), index=False, float_format="%.4f")

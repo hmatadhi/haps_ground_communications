@@ -27,24 +27,17 @@ def rain_attenuation_db(rain_mm_h, freq_ghz, elevation_deg=45.0, slant_path_km=N
     freq = float(freq_ghz)
     elev = float(np.clip(elevation_deg, 5.0, 90.0))
 
-    # ITU-R P.838 coefficients (for vertical/circular polarization)
-    # Table of k, alpha for various frequencies
-    if freq < 1:
-        k, alpha = 0.0000387, 0.912
-    elif freq < 2:
-        k, alpha = 0.0000385, 0.912
-    elif freq < 5:
-        k, alpha = 0.000120, 0.920
-    elif freq < 10:
-        k, alpha = 0.000380, 0.921
-    elif freq < 20:
-        k, alpha = 0.0648, 0.921
-    elif freq < 40:
-        k, alpha = 0.175, 0.921
-    elif freq < 50:
-        k, alpha = 0.301, 0.921
-    else:
-        k, alpha = 0.350, 0.921
+    # ITU-R P.838 coefficients, horizontal polarization, from itur.models.itu838
+    # .rain_specific_attenuation_coefficients at 21.75 deg (the nominal elevation of this plot).
+    # Interpolated in log(frequency); the values used by the paper are the itur values.
+    P838_FREQ_GHZ = np.array([1.0, 2.0, 5.0, 10.0, 20.0, 30.0, 38.0, 40.0, 50.0, 60.0, 75.0, 100.0])
+    P838_K = np.array([3e-05, 9e-05, 0.00022, 0.01211, 0.09195, 0.23954,
+                       0.39903, 0.44198, 0.65908, 0.85999, 1.10448, 1.36717])
+    P838_ALPHA = np.array([0.9602, 1.057, 1.6843, 1.2544, 1.0516, 0.9461,
+                           0.8798, 0.8656, 0.8069, 0.7645, 0.7214, 0.6811])
+    lf = np.log(np.clip(freq, P838_FREQ_GHZ[0], P838_FREQ_GHZ[-1]))
+    k = float(np.exp(np.interp(lf, np.log(P838_FREQ_GHZ), np.log(P838_K))))
+    alpha = float(np.interp(lf, np.log(P838_FREQ_GHZ), P838_ALPHA))
 
     # Specific rain attenuation [dB/km]
     gamma_r = k * (rain ** alpha)

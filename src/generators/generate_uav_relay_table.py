@@ -24,7 +24,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from models.channel_model import (
     haps_a2g_pathloss_db, rx_power_dbm, sinr_db, uav_relay_two_hop_capacity_bps_hz,
-    HAPS_ALT_M, UAV_ALT_M, P_TX_HAPS_DBM, NOISE_DBM, ENVIRONMENTS,
+    multi_node_sinr_db_spatial, HAPS_ALT_M, UAV_ALT_M, P_TX_HAPS_DBM, NOISE_DBM, ENVIRONMENTS,
 )
 
 # Output directories (matches generate_relay_table.py's convention: run from
@@ -57,9 +57,13 @@ for env in LANDSCAPES:
         pl_direct_db = float(np.asarray(
             haps_a2g_pathloss_db(r_m, HAPS_ALT_M, f_hz=FREQ_SERVICE_HZ, h_user_m=USER_ALT_M)
         ).flat[0])
-        sinr_direct_db = float(np.asarray(
-            sinr_db(rx_power_dbm(P_TX_HAPS_DBM, pl_direct_db), noise_dbm=NOISE_DBM)
-        ).flat[0])
+        # Co-channel interference from the two other HAPS included. Averaged in dB over 24
+        # azimuths around the serving HAPS, as the Phase-1 table (table:app-sinr-multinode-distances).
+        azimuths = np.linspace(0.0, 2.0 * np.pi, 24, endpoint=False)
+        sinr_direct_db = float(np.mean([
+            float(np.asarray(multi_node_sinr_db_spatial(r_m * np.cos(a), r_m * np.sin(a),
+                                                        env=env)["SINR_dB"]).flat[0])
+            for a in azimuths]))
         capacity_direct = float(np.log2(1.0 + 10.0 ** (sinr_direct_db / 10.0)))
 
         # Relay HAPS->UAV->UE (clear-sky HAPS->UAV hop, landscape-dependent UAV->UE hop)
@@ -175,7 +179,7 @@ ax.set_xlabel('HAPS–UAV horizontal distance [km]')
 ax.set_ylabel('SINR [dB]')
 ax.set_title('Direct Link vs. HAPS→UAV→UE Relay Hops')
 ax.grid(True, alpha=0.3)
-ax.legend(loc='upper right', fontsize=9)
+ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.16), ncol=2, fontsize=9, frameon=False)
 fig.tight_layout()
 
 fig_path = os.path.join(OUTPUT_DIR, '12_uav_relay_comparison.png')
