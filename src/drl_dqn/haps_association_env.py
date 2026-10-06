@@ -186,6 +186,7 @@ class HAPSAssociationEnv:
                 gw_ue_dist_m=dist_m[:, p],
             )
             relay_capacity[:, p] = relay["capacity_relay_bps_hz"]
+            self._feeder_capacity_bps_hz = float(relay["capacity_feeder_bps_hz"])
         self._relay_capacity = relay_capacity
 
         uav_relay_capacity = np.zeros((self.n_users, self.n_haps))
@@ -240,6 +241,12 @@ class HAPSAssociationEnv:
         # computations.
         direct_sinr_db = self._sinr_db[user_idx, serving_haps]
         gw_relay_capacity = self._relay_capacity[user_idx, serving_haps]
+        if getattr(self, "shared_gateway", False):
+            # One physical gateway (paper: 1 ground gateway for all 3 HAPS). Its feeder capacity
+            # is divided equally among all users routed through it, so crowding reduces throughput.
+            n_gw_users = int(np.sum(is_gw_relay))
+            share = self._feeder_capacity_bps_hz / max(n_gw_users, 1)
+            gw_relay_capacity = np.minimum(gw_relay_capacity, share)
         gw_relay_sinr_db = 10.0 * np.log10(np.maximum(2.0 ** gw_relay_capacity - 1.0, 1e-15))
         uav_relay_capacity = self._uav_relay_capacity[user_idx, serving_haps]
         uav_relay_sinr_db = 10.0 * np.log10(np.maximum(2.0 ** uav_relay_capacity - 1.0, 1e-15))
@@ -287,9 +294,15 @@ class HAPSAssociationEnv:
         # Rain degrades the 38 GHz feeder (backhaul) link, not the 2 GHz
         # service-link SINR above -- so it de-rates only the throughput
         # credit, leaving fairness/energy/outage penalties untouched.
-        rain = self.weather_state.rain_mm_h if self.weather_state else 0.0
-        feeder = feeder_link_rain_effect_on_capacity(rain)
-        capacity_fraction = float(np.clip(10.0 ** (-feeder["total_rain_loss_db"] / 10.0), 0.05, 1.0))
+        # rain_att_override_db (set by RealEpisodeEnv) replaces the paper's rain-loss model
+        # with the ITU-R P.618 path attenuation for the hour. None keeps the paper's model.
+        override_db = getattr(self, "rain_att_override_db", None)
+        if override_db is not None:
+            rain_loss_db = float(override_db)
+        else:
+            rain = self.weather_state.rain_mm_h if self.weather_state else 0.0
+            rain_loss_db = feeder_link_rain_effect_on_capacity(rain)["total_rain_loss_db"]
+        capacity_fraction = float(np.clip(10.0 ** (-rain_loss_db / 10.0), 0.05, 1.0))
         effective_throughput = individual_throughput * capacity_fraction
 
         shared_term = self.omega_2 * jain - self.omega_3 * energy_penalty + low_battery_penalty
