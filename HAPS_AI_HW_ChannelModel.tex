@@ -100,7 +100,7 @@ A typical HAPS system consists of a stratospheric, solar-powered platform operat
 \subsection{Challenges and Impacts on Connectivity}
 \subsubsection{Atmospheric Losses}
 \begin{itemize}
-  \item The 38.0--39.5 GHz link (Ka-band) incurs significant atmospheric loss from rain (~8--18 dB at 10--25 mm/h per ITU-R P.838~\cite{itu_p838}), fog~\cite{itu_p840}, and gas absorption~\cite{itu_p676}. The 38 GHz band is still chosen as it offers practical spectrum allocation and manageable link margins avoiding the 22.235 GHz water-vapor absorption resonance~\cite{itu_p676} and the 60 GHz oxygen peak~\cite{itu_p676}.
+  \item The 38.0--39.5 GHz link (Ka-band) incurs significant atmospheric loss from rain (specific attenuation $\approx$3.0--6.8\,dB/km at 10--25\,mm/h per ITU-R P.838~\cite{itu_p838}), fog~\cite{itu_p840}, and gas absorption~\cite{itu_p676}. The 38 GHz band is still chosen as it offers practical spectrum allocation and manageable link margins avoiding the 22.235 GHz water-vapor absorption resonance~\cite{itu_p676} and the 60 GHz oxygen peak~\cite{itu_p676}.
   \item The 2 GHz link exhibits high resilience to atmospheric effects according to ITU-R P.618~\cite{itu_p618}, providing a stable ``last-mile'' connection even under adverse weather. But it is sensitive to building blockage, which can cause significant path loss.
 \end{itemize}
 \subsubsection{Elevation Angle and Slant Path}
@@ -242,7 +242,7 @@ rate $R$ (mm/h) using the empirical ITU-R P.838 coefficients~\cite{itu_p838} $k,
 \label{eq:rain_spec_atten}
 \end{equation}
 
-For 38 GHz, typical coefficients are $k=0.0318$ and $\alpha=0.921$ per ITU-R P.838 Annex 1~\cite{itu_p838}. These values are interpolated from Table 1 (P.838 Annex 1) and represent the power-law relationship between the rain rate and attenuation.
+For 38 GHz and $11.3^\circ$ elevation, the horizontal-polarisation coefficients computed with the \texttt{itur} implementation of ITU-R P.838 are $k\approx0.400$ and $\alpha\approx0.881$, giving $\gamma_R\approx3.04$\,dB/km at 10\,mm/h and $\approx6.82$\,dB/km at 25\,mm/h~\cite{itu_p838}. These values represent the power-law relationship between rain rate and specific attenuation.
 
 When we multiply the effective path length $L_\mathrm{eff}$ (km) by this, we
 obtain the rain loss:
@@ -252,9 +252,8 @@ A_\mathrm{rain} = \gamma_R \; L_\mathrm{eff} \quad [\mathrm{dB}],
 \end{equation}
 
 \subsubsection{Equation (3) --- Total Rain Attenuation~\cite{itu_p618}}
-$L_\mathrm{eff}$ is computed according to ITU-R P.618~\cite{itu_p618} (slant-path reduction factors and
-site-dependent scaling for non-uniform rain along the path). For the worst-case backhaul link (102 km slant, 11.3$^\circ$ elevation),
-$L_\mathrm{eff} \approx 66$ km with reduction factor $r(\theta) \approx 0.65$, which yields an attenuation of approximately \textbf{5.9 dB at 10 mm/h} and \textbf{15.2 dB at 25 mm / h}~\cite{itu_p618}.
+The effective path length $L_\mathrm{eff}$ follows ITU-R P.618~\cite{itu_p618} (slant-path reduction factors and
+site-dependent scaling for non-uniform rain along the path). The specific attenuation above is reported directly: for the 38\,GHz, $11.3^\circ$ worst-case backhaul path (102\,km slant), $\gamma_R\approx3.0$\,dB/km at 10\,mm/h and $\approx6.8$\,dB/km at 25\,mm/h. Multiplying by $L_\mathrm{eff}$ gives the path attenuation for a given rain rate; that product is evaluated against the site rain statistics in the link-budget analysis rather than here.
 
 \subsubsection{Equation (4) --- Fog/Cloud Attenuation~\cite{itu_p840}}
 Fog attenuation depends on the liquid-water density $M$ [g/m$^3$], frequency
