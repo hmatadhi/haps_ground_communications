@@ -1,0 +1,26 @@
+property,source,hourly,used_by_lstm,test_mae_db,persist_mae_db,note
+rain_att_forecast_h1,LSTM,True,False,2.0617,1.4531,"Forecast of P.838 x L_EFF rain attenuation, h hours ahead"
+rain_att_forecast_h2,LSTM,True,False,2.4025,2.3306,"Forecast of P.838 x L_EFF rain attenuation, h hours ahead"
+rain_att_forecast_h3,LSTM,True,False,2.6629,2.8656,"Forecast of P.838 x L_EFF rain attenuation, h hours ahead"
+rain_att_forecast_h4,LSTM,True,False,2.8556,3.2127,"Forecast of P.838 x L_EFF rain attenuation, h hours ahead"
+rain_att_forecast_h5,LSTM,True,False,2.9792,3.4910,"Forecast of P.838 x L_EFF rain attenuation, h hours ahead"
+rain_att_forecast_h6,LSTM,True,False,3.0477,3.7265,"Forecast of P.838 x L_EFF rain attenuation, h hours ahead"
+rain_att_label (P.838 x L_EFF),itur,True,False,,,"max 453 dB: L_EFF placeholder, no path-reduction factor"
+gas_att (P.676),itur,True,False,,,range 0.89-4.43 dB
+"scint_att (P.618, 1 %)",itur,True,False,,,"range 0.6216-0.6232 dB: near constant, units/inputs need checking"
+"cloud_att (P.840, 1 %)",itur,False,False,,,"site statistic 16.73 dB, not hourly"
+input: t2m_c,NASA POWER / METAR / ERA5 / derived,True,True,,,
+input: rh2m_pct,NASA POWER / METAR / ERA5 / derived,True,True,,,
+input: ps_kpa,NASA POWER / METAR / ERA5 / derived,True,True,,,
+input: ws10m_ms,NASA POWER / METAR / ERA5 / derived,True,True,,,
+input: precip_mmh,NASA POWER / METAR / ERA5 / derived,True,True,,,
+input: cloud_amt_pct,NASA POWER / METAR / ERA5 / derived,True,True,,,
+input: vis_km,NASA POWER / METAR / ERA5 / derived,True,True,,,
+input: vis_missing,NASA POWER / METAR / ERA5 / derived,True,True,,,
+input: wx_rain,NASA POWER / METAR / ERA5 / derived,True,True,,,
+input: wx_fog,NASA POWER / METAR / ERA5 / derived,True,True,,,
+input: cloud_liquid_water_kgm2,NASA POWER / METAR / ERA5 / derived,True,True,,,
+input: hour_sin,NASA POWER / METAR / ERA5 / derived,True,True,,,
+input: hour_cos,NASA POWER / METAR / ERA5 / derived,True,True,,,
+input: doy_sin,NASA POWER / METAR / ERA5 / derived,True,True,,,
+input: doy_cos,NASA POWER / METAR / ERA5 / derived,True,True,,,

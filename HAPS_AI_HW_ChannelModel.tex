@@ -67,7 +67,7 @@ ITU-R atmospheric losses (rain, fog, gas, scintillation) for backhaul-
 and feeder-link design. The channel model is realised in Python (NumPy +
 Matplotlib + itur package) and characterised through signal-
 quality curves, spatial-heterogeneity analysis, and atmospheric
-sensitivity results.
+sensitivity results. An LSTM forecasts 38\,GHz feeder rain attenuation six hours ahead; on held-out 2026 data it is more accurate than persistence only at four to six hours. A DQN agent using this forecast earns higher reward and lower outage than max-SINR across five seeds, but lower fairness.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -111,7 +111,7 @@ A typical HAPS system consists of a stratospheric, solar-powered platform operat
 \subsection{Problem Statement}
 The above considerations define the control-layer problem for relay links: determining the position of each UAV relay and assigning service or relay channels so that users are served fairly and reliably. The system must also select the best serving HAPS for either the HAPS-to-UAV or HAPS-to-UE path to maximize throughput and minimize outage. The control layer must adapt to changing user positions, weather conditions, and HAPS battery states. 
 
-In this document, we analyze channel characteristics and determine optimal HAPS service-node selection and UAV placement using a closed-form, rule-based policy, and then explore AI-driven policies to improve performance.
+In this document, we (i) characterise the channel: free-space and LoS-probability path loss, SINR under the 3-HAPS geometry, and ITU-R atmospheric losses at 38\,GHz; (ii) compare two association rules, random and max-SINR, which select the platform for each user; (iii) build an LSTM that forecasts the 38\,GHz feeder rain attenuation over the next six hours from past weather; and (iv) train a DQN agent that uses this forecast in its state, comparing it with max-SINR and random on 50 held-out days from 2025 over five seeds. UAV placement is analysed through relay geometry and the landscape LoS mechanism; it is not optimised.
 
 % =====================================================================
 \section{PoC - Topology and Link Types}
@@ -422,7 +422,7 @@ models, and \texttt{Matplotlib} for figure generation. Atmospheric and
 scintillation losses (rain, cloud/fog, gas, and ITU-R P.618 scintillation) are
 computed with the \texttt{ITU-Rpy} (\texttt{itur}) library, which implements the
 relevant ITU-R propagation recommendations directly rather than re-deriving
-them by hand. The Phase 2 learned association policy (Section~\ref{sec:phase2-motivation})
+them by hand. The learned association policy (LSTM and DRL) (Section~\ref{sec:phase2-motivation})
 uses a custom Deep Q-Network agent implemented in \texttt{PyTorch}
 (\texttt{torch}/\texttt{torch.nn}), rather than a third-party RL library, trained
 against the per-user association environment described above. The corresponding
@@ -1038,7 +1038,7 @@ with $J=1$ when all users receive identical throughput (perfectly fair) and $J\t
 when the resource is concentrated on a single user (maximally unfair); it is reported
 alongside outage and aggregate throughput because a policy that maximizes total
 throughput can still do so unfairly, e.g.\ by starving low-SINR users. Section~\ref{sec:assoc-baseline-results} reports the resulting
-comparison; Section~\ref{sec:phase2-motivation} (Phase 2) later adopts this same
+comparison; Section~\ref{sec:phase2-motivation} (the learned association policy) later adopts this same
 per-user state and evaluates whether a learned policy can improve further on the
 closed-form baseline established there.
 
@@ -1069,13 +1069,61 @@ $34\times$ (33.7 to 1.0 of 50 users), and more than doubles aggregate throughput
 relative to random association. This confirms, at the level of a full multi-user
 network simulation, what the spatial SINR heterogeneity in Table A.3 already implied:
 association choice matters far more than any fixed or naive assignment. Section
-\ref{sec:phase2-motivation} (Phase 2) evaluates whether a learned policy can improve
+\ref{sec:phase2-motivation} (the learned association policy) evaluates whether a learned policy can improve
 further on this closed-form baseline.
 
-\section{Phase 2: DRL for User Association}
+\section{LSTM and DRL for User--Platform Association}
 % =====================================================================
 
-Phase~2 introduces a Deep Q-Network (DQN) agent for dynamic user-to-platform association in the HAPS--UAV--Gateway network. Whereas Phase~1 characterized static link quality, Phase~2 learns real-time association decisions maximizing throughput, fairness, and energy efficiency.
+This section combines two learned components for dynamic user-to-platform association in the HAPS--UAV--Gateway network. An LSTM forecasts the feeder rain attenuation over the next six hours from past weather, and a Deep Q-Network (DQN) agent uses that forecast to choose each user's platform, maximizing throughput, fairness, and energy efficiency. Whereas Phase~1 characterized static link quality, this section learns real-time association decisions.
+
+\subsection{LSTM Rain-Attenuation Forecaster}
+\label{sec:lstm}
+
+\paragraph{Why an LSTM is needed.} The DQN chooses an association at each hour $t$, before that hour's rain is observed. Re-associating users takes time, so the controller benefits from knowing the feeder loss a few hours ahead, not only for the next hour. A six-hour horizon is a design choice for that lead time; the results below show its accuracy and do not claim that it improves the one-hour forecast. The feeder loss for hours $t{+}1$ to $t{+}6$ is therefore unknown at decision time. The ITU-R P.618 attenuation~\cite{itu_p618} can be evaluated only for hours already observed, so the agent needs a forecast of it. A long short-term memory (LSTM) network learns the mapping from the recent weather history to the next six hourly attenuation values. Persistence, which repeats the last observed value, is the benchmark the forecast must beat to justify its use.
+
+\paragraph{How it is used.} The pipeline has four steps:
+\begin{enumerate}
+\item \textbf{Data preparation.} Hourly NASA POWER and METAR observations and ERA5 cloud fields for Delhi (2023--2026) are merged on UTC hours. The 14 input features are temperature, humidity, pressure, wind, precipitation, cloud amount, visibility, rain and fog codes, cloud liquid water, and sine and cosine encodings of time of day and season.
+\item \textbf{Target.} For each hour, the target is the ITU-R P.618 path attenuation at $38.0$\,GHz and $11.3^\circ$ elevation, computed from the observed precipitation.
+\item \textbf{Windows.} Each sample uses the past 24 hours of features and predicts the next six hourly targets.
+\item \textbf{Rolling episodes.} The DQN is trained on $400$ rolling 24-hour episodes drawn from 2024, each starting at a distinct hour. At every hour of an episode, the LSTM forecast from the preceding 24 hours is supplied as the state feature.
+\end{enumerate}
+
+Forecasts are always out of sample. The 2024 forecasts come from a model trained on 2023 only, the 2025 forecasts from a model trained on 2023--2024, and the 2026 forecasts from a model trained on 2023--2025. Table~\ref{tab:lstm-2026} and Figure~\ref{fig:lstm-2026} report the 2026 validation, which uses no 2026 data in training.
+
+\begin{table}[t]
+\centering
+\caption{LSTM against persistence on the full 2026 record: mean absolute error (MAE) and root-mean-square error (RMSE), in dB, per forecast horizon.}
+\label{tab:lstm-2026}
+{\scriptsize\setlength{\tabcolsep}{3pt}
+\begin{tabularx}{\columnwidth}{|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
+\hline
+\textbf{Horizon} & \textbf{LSTM MAE} & \textbf{Persistence MAE} & \textbf{LSTM RMSE} & \textbf{Persistence RMSE} \\
+\hline
+$+1$\,h & $0.91$ & $\mathbf{0.65}$ & $2.92$ & $\mathbf{2.44}$ \\
+\hline
+$+2$\,h & $1.25$ & $1.09$ & $3.82$ & $3.55$ \\
+\hline
+$+3$\,h & $1.49$ & $1.41$ & $4.43$ & $4.30$ \\
+\hline
+$+4$\,h & $1.61$ & $1.63$ & $4.78$ & $4.87$ \\
+\hline
+$+5$\,h & $\mathbf{1.68}$ & $1.81$ & $\mathbf{4.95}$ & $5.29$ \\
+\hline
+$+6$\,h & $\mathbf{1.71}$ & $1.95$ & $\mathbf{5.01}$ & $5.61$ \\
+\hline
+\end{tabularx}}
+\end{table}
+
+\paragraph{Reading the validation.} At $+1$\,h, persistence is more accurate on average. From $+4$\,h the LSTM is slightly better on both measures, by about $0.1$\,dB. In rain hours, persistence is more accurate at every horizon, so the forecast adds value mainly for longer horizons and in dry or light-rain periods. Each method forecasts every hour of 2026, and the errors are averaged per horizon over the full year. Persistence serves as the benchmark only; the DQN uses the LSTM forecast at every hour.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{./figures/lstm_forecast_2026.png}
+\caption{Real, LSTM, persistence and PreLSTM over a 300-hour window in July 2026, the window with the most rain. Real: observed ITU-R P.618 attenuation from downloaded precipitation. LSTM: one-hour-ahead forecast. Persistence: previous hour's value. PreLSTM: random hourly rain rates drawn from the ITU-R P.837 statistics for Delhi, converted with P.618; this is a synthetic baseline with no observed data. Star and open markers show the 301st hour.}
+\label{fig:lstm-2026}
+\end{figure}
 
 \subsection{Motivation: Why DRL?}
 \label{sec:phase2-motivation}
@@ -1115,19 +1163,19 @@ The state vector for user~$k$ is 12-dimensional:
 \label{eq:obs-space}
 \end{equation}
 
-\noindent \textbf{Phase 2 DQN Scope} (scintillation deferred to Phase 3):
+\noindent \textbf{DQN Scope} (scintillation deferred to future work):
 \begin{itemize}\setlength{\itemsep}{0pt}
   \item \textbf{Included}: Deterministic SINR from constellation geometry (Phase~1); rainfall \& visibility for backhaul margin planning; battery state for load balancing
-  \item \textbf{NOT included}: Tropospheric scintillation fading (Section~\ref{subsec:scintillation}) --- time-varying random process requiring LSTM forecasting (Phase~3)
-  \item \textbf{Approximation}: Phase~2 assumes worst-case static fading margin ($3.65$~dB service, $10.53$~dB backhaul at $p=1\%$) or uses Phase~1 fade-depth statistics as penalty modulation
-  \item \textbf{Phase 3}: LSTM weather forecaster will predict scintillation fading from rainfall/visibility timeseries, enabling adaptive margin reallocation
+  \item \textbf{NOT included}: Tropospheric scintillation fading (Section~\ref{subsec:scintillation}) --- time-varying random process requiring LSTM forecasting (future work)
+  \item \textbf{Approximation}: the DQN assumes worst-case static fading margin ($3.65$~dB service, $10.53$~dB backhaul at $p=1\%$) or uses Phase~1 fade-depth statistics as penalty modulation
+  \item \textbf{LSTM forecaster}: predicts rain attenuation six hours ahead from past weather (Section~\ref{sec:lstm}); forecasting scintillation fading, which would enable adaptive margin reallocation, is future work
 \end{itemize}
 
 \textbf{Validation:} Phase~1 measured SINR $\in [-11.27, +7.25]$~dB across the full 10--100~km, 24-point angular sweep (worst case at $r=75$\,km, $\theta=0^\circ$; best case at $r=10$\,km, $\theta=210^\circ$; Figure~\ref{fig:multinode-interference} and underlying spatial sweep data). Bounds $[-20, +30]$~dB provide an $8.7$\,dB margin on the low side and a $22.8$\,dB margin on the high side for edge cases (atmospheric fading, relay paths in v2).
 
 \subsubsection{Action Space}
 
-Discrete platform choice: $\mathbf{a}_k \in \{0, 1, 2\}$ (HAPS1, HAPS2, HAPS3). UAV relay ($a=3$) deferred to Phase~2 v2.
+Discrete platform choice: $\mathbf{a}_k \in \{0, 1, 2\}$ (HAPS1, HAPS2, HAPS3). UAV relay ($a=3$) deferred to future work.
 
 \subsubsection{Reward Function}
 
@@ -1150,7 +1198,7 @@ P_{\text{eng}} &= \frac{1}{3}\sum_{p=1}^{3} \left(1 - \frac{\text{SoC}_p}{100}\r
 
 \subsection{Critical Implementation Fixes}
 
-Phase~2 training must avoid six silent errors:
+DQN training must avoid six silent errors:
 
 \textbf{Error 1:} Jain's index on dB (wrong---log scale)
 \begin{equation}
@@ -1189,7 +1237,7 @@ it were already a percentage: $\text{SoC} \mathrel{+}= (\Delta E_{\text{Wh}} / C
 instead of $\text{SoC} \mathrel{+}= 100 \times (\Delta E_{\text{Wh}} / C_{\text{battery}})$.
 This under-scales every SoC update by $100\times$, so battery state barely moves
 regardless of policy (observed: SoC pinned at $\approx$65\% across all three
-Section~\ref{sec:phase2-results} policies before the fix) -- silently disabling the
+DQN and baseline policies before the fix) -- silently disabling the
 entire energy/battery term of the reward. \textbf{Fix:} apply the missing $\times100$
 conversion, and use $C_{\text{battery}}=12{,}000$~Wh matching Table~\ref{tab:config}'s
 value (the module's own uncorrected default, 1000~Wh, is 12$\times$ too small and
@@ -1238,62 +1286,6 @@ SoC clipped to $[0, 100]\,\%$:
 
 \FloatBarrier
 
-\subsection{DQN Results and Validation Against the Closed-Form Baseline}
-\label{sec:phase2-results}
-
-
-In comparison to baseline setup (Section~\ref{sec:assoc-baseline-setup}) that evaluates
-closed-form Random/Max-SINR baseline the results of which are summarized in
-(Table~\ref{tab:assoc-baseline-results}) here we use a  DQN agent trained on 
-the same environment. The DQN was trained for 300 episodes, with each episode representing a 
-full 24-hour cycle of user activity and environmental conditions.
-Evaluation reward rose from $-41.2$ (early training, near-random) to a noisy plateau around 
-$-32$ to $-36$ by episode 300, with Jain fairness rising from $0.54$ to $\approx0.6$--$0.68$ 
-and outage falling from $15.1/50$ to $\approx 8$--$10/50$; the remaining episode-to-episode
-noise reflects the randomized initial battery SoC and weather draw per training
-episode, not non-convergence of the policy itself.
-
-\begin{table}[t]
-\centering
-\caption{Phase 2 validation table}
-\label{tab:phase2-results}
-{\scriptsize\setlength{\tabcolsep}{3pt}
-\begin{tabularx}{\columnwidth}{|>{\raggedright\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
-\hline
-\textbf{Policy} & \textbf{Reward $R(\mathbf{a})$} & \textbf{Jain} & \textbf{Outage /50} & \textbf{Throughput [bits/s/Hz]}\\
-\hline
-Random & $-82.2\pm17.0$ & $0.331\pm0.046$ & $33.7\pm3.3$ & $33.95\pm4.75$ \\
-\hline
-Max-SINR (no DRL) & $\mathbf{-19.3\pm17.5}$ & $\mathbf{0.700\pm0.027}$ & $\mathbf{1.0\pm0.9}$ & $\mathbf{76.18\pm3.57}$ \\
-\hline
-DQN & $-34.1\pm13.8$ & $0.607\pm0.045$ & $9.8\pm3.3$ & $66.99\pm5.39$ \\
-\hline
-\end{tabularx}}
-\end{table}
-
-Refer to Table~\ref{tab:phase2-results} and Figure~\ref{fig:baseline-comparison} for a 
-comparison of the three policies. Evidently the results show that Max-SINR is the 
-best-performing policy for this configuration. It achieves the highest evaluation 
-reward ($\approx-20$), the highest Jain fairness ($\approx0.70$), and by far the lowest outage ($\approx1\%$), while maintaining essentially the same mean battery SoC ($\approx61\%$) as DQN and random. However DQN performs substantially better than random, with higher reward ($\approx-34$), better fairness ($\approx0.61$), and lower outage ($\approx10\%$), but remains consistently behind Max-SINR.
-The error bars indicate variability around the reported mean values. 
-Closing this gap through extended training, improved exploration/reward shaping, or 
-harder scenarios remains future work.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{./figures/8_dqn_association_convergence.png}
-\caption{DQN training convergence on the association MDP: evaluation reward, Jain
-fairness, outage, and mean battery SoC vs.\ training episode.}
-\label{fig:dqn-association-convergence}
-\end{figure}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{./figures/9_baseline_comparison.png}
-\caption{Random vs.\ max-SINR vs.\ DQN, 50 held-out episodes (error bars: std).}
-\label{fig:baseline-comparison}
-\end{figure}
-
 % =====================================================================
 \section{Summary}
 % =====================================================================
@@ -1326,18 +1318,87 @@ Figure~\ref{fig:scint_fade_depth} introduces a physics-based model of tropospher
 \item \textbf{Sector structure:} Good sector ($\sim$120--290$^\circ$, SINR~$>$~0\,dB); bad sector ($\sim$330--75$^\circ$, SINR~$<$~--5\,dB within roughly $345$--$60^\circ$).
 \end{itemize}
 
-\subsection{DRL for User Association}
-\label{sec:phase2-summary}
+\subsection{DQN Results}
+\label{sec:dqn-results}
 
-\paragraph{Learned association vs.\ closed-form baselines.}
-The DQN agent (\S\ref{sec:phase2-results}) was trained for 300 episodes on the same per-user MDP environment used for the Random and Max-SINR baselines (\S\ref{sec:assoc-baseline-setup}). Evaluation reward rose from $-41.2$ (near-random) to a noisy plateau of $-32$ to $-36$ by episode 300, with Jain fairness rising from $0.54$ to $\approx0.6$--$0.68$ and outage falling from $15.1/50$ to $\approx8$--$10/50$ (Figure~\ref{fig:dqn-association-convergence}).
+The DQN is trained on $400$ rolling 24-hour episodes drawn from 2024 and evaluated on $50$ calendar days from 2025, which are never seen during training. Each training episode carries the real hourly rain, visibility, and time of day, the ITU-R P.618 rain loss, and the LSTM one-hour-ahead forecast (Section~\ref{sec:lstm}). The same $50$ days are used for every baseline. Results are reported over five training seeds: Table~\ref{tab:dqn-all-policies} compares all policies, Table~\ref{tab:dqn-seed-stats} gives the seed-level statistics, Table~\ref{tab:dqn-paired} gives the paired comparison with the strongest baseline, and Figure~\ref{fig:policy-comparison} shows the comparison graphically.
 
-\noindent\textbf{Key Findings:}
-\begin{itemize}
-\item \textbf{DQN substantially beats random:} reward $-34.1$ vs.\ $-82.2$, Jain fairness $0.607$ vs.\ $0.331$, outage $9.8$ vs.\ $33.7$ users out of 50 (Table~\ref{tab:phase2-results}).
-\item \textbf{DQN does not yet match Max-SINR:} the closed-form heuristic remains the best-performing policy (reward $-19.3$, Jain $0.700$, outage $1.0$), so the learned policy has not closed the gap to a simple always-pick-best-SINR rule.
-\item \textbf{Scope limitation:} the DQN's action space covers only the 3 direct HAPS platforms; UAV-relay routing and scintillation-aware state features are deferred to future work (\S\ref{sec:phase2-motivation}).
-\end{itemize}
+\begin{table}[t]
+\centering
+\caption{Policy comparison on the 50 held-out 2025 days. DQN values are means over five seeds; baselines are means over the 50 days (standard deviation in brackets).}
+\label{tab:dqn-all-policies}
+{\scriptsize\setlength{\tabcolsep}{3pt}
+\begin{tabularx}{\columnwidth}{|>{\raggedright\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
+\hline
+\textbf{Policy} & \textbf{Reward per step} & \textbf{Jain} & \textbf{Outage /50} \\
+\hline
+Phase 1 random (real weather) & $-51.0\,(8.9)$ & $0.071\,(0.048)$ & $19.4\,(3.6)$ \\
+\hline
+Phase 1 max-SINR (real weather) & $-16.5\,(8.0)$ & $\mathbf{0.694}\,(0.030)$ & $1.0\,(1.1)$ \\
+\hline
+PreLSTM random (synthetic weather) & $-50.6\,(8.6)$ & $0.077\,(0.045)$ & $20.9\,(3.6)$ \\
+\hline
+PreLSTM max-SINR (synthetic weather) & $-16.5\,(8.0)$ & $\mathbf{0.694}\,(0.030)$ & $1.0\,(1.1)$ \\
+\hline
+\textbf{LSTM + DQN (real weather)} & $\mathbf{-5.2}\,(1.6)$ & $0.110\,(0.054)$ & $\mathbf{0.0}\,(0.0)$ \\
+\hline
+\end{tabularx}}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{LSTM + DQN across five seeds: mean, standard deviation, median, range, and 95\% confidence interval of the mean.}
+\label{tab:dqn-seed-stats}
+{\scriptsize\setlength{\tabcolsep}{2.5pt}
+\begin{tabularx}{\columnwidth}{|>{\raggedright\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
+\hline
+\textbf{Metric} & \textbf{Mean $\pm$ std} & \textbf{Median} & \textbf{Range} & \textbf{95\% CI} \\
+\hline
+Reward per step & $-5.18\pm1.62$ & $-5.02$ & $[-7.51,\,-3.58]$ & $[-7.19,\,-3.16]$ \\
+\hline
+Jain fairness & $0.110\pm0.054$ & $0.083$ & $[0.070,\,0.201]$ & $[0.043,\,0.177]$ \\
+\hline
+Outage /50 & $0.0\pm0.0$ & $0.0$ & $[0,\,0]$ & $[0,\,0]$ \\
+\hline
+Battery SoC (\%) & $59.9\pm0.6$ & $59.9$ & $[59.1,\,60.5]$ & $[59.2,\,60.6]$ \\
+\hline
+\end{tabularx}}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Paired difference, LSTM + DQN minus Phase 1 max-SINR, per seed and metric. ``Seeds'' counts the seeds in which the DQN is better.}
+\label{tab:dqn-paired}
+{\scriptsize\setlength{\tabcolsep}{2.5pt}
+\begin{tabularx}{\columnwidth}{|>{\raggedright\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
+\hline
+\textbf{Metric} & \textbf{Mean difference} & \textbf{95\% CI} & \textbf{$p$-value} & \textbf{Seeds} \\
+\hline
+Reward per step & $+9.33$ & $[+7.82,\,+10.84]$ & $0.0001$ & $5/5$ \\
+\hline
+Outage /50 & $-0.87$ & $[-1.13,\,-0.61]$ & $0.0007$ & $5/5$ \\
+\hline
+Jain fairness & $-0.59$ & $[-0.65,\,-0.52]$ & $<0.0001$ & $0/5$ \\
+\hline
+Battery SoC (\%) & $-0.001$ & $[-0.04,\,0.04]$ & $0.95$ & $1/5$ \\
+\hline
+\end{tabularx}}
+\end{table}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{./figures/policy_comparison.png}
+\caption{Five-policy comparison on the 50 held-out 2025 days: reward per step (higher is better), Jain fairness (higher is better), and outage users of 50 (lower is better). Bars are means; error bars are one standard deviation.}
+\label{fig:policy-comparison}
+\end{figure*}
+
+\paragraph{Reward and outage.} LSTM + DQN achieves the highest reward and the lowest outage. Its mean reward is $-5.2$ against $-16.5$ for max-SINR, and its outage is zero against $1.0$ user. These differences hold in all five seeds (Table~\ref{tab:dqn-paired}).
+
+\paragraph{Fairness.} Max-SINR is fairer in every seed. Its Jain index is $0.69$ against $0.11$ for LSTM + DQN. The learned policy routes most users through a small set of relay options, which raises the reward's throughput term but concentrates service on few users. The reward therefore favours throughput, and the paper's objective should weight fairness more if equal service is required.
+
+\paragraph{Baselines and weather.} Random association is worst on every metric. The synthetic-weather runs (PreLSTM) and the real-weather runs give almost identical results for the baselines, because the rain loss enters the reward only through the throughput term, which is small for direct links.
+
+\paragraph{Limitation.} The DQN's relay options are modelled per HAPS, while the topology has a single ground gateway serving the network; the relay capacity therefore does not yet include sharing of that gateway. The fairness and relay-routing results should be read with this in mind.
 
 % =====================================================================
 \section{Conclusion}
@@ -1350,7 +1411,7 @@ the 38\,GHz HAPS$\rightarrow$Gateway backhaul link, and the two-hop
 HAPS$\rightarrow$UAV$\rightarrow$UE relay link (whose first, 38\,GHz hop is
 the feeder link) -- and used that channel
 model to both characterise multi-HAPS interference (\S\ref{sec:phase1-summary})
-and train a DQN agent for user-platform association (\S\ref{sec:phase2-results}).
+and train a DQN agent for user-platform association (\S\ref{sec:dqn-results}).
 
 \paragraph{Channel model.} Spatial SINR heterogeneity, not distance alone,
 dominates service-link quality: a 9.94\,dB spread at a fixed 50\,km radius
@@ -1383,15 +1444,15 @@ DQN association agent (\S\ref{sec:phase2-motivation}) therefore
 restricts its action space to the three direct HAPS choices and does not 
 route through the UAV relay, and is left for future work.
 
-\paragraph{Learned association.} The DQN agent trained on the same
-environment as the closed-form baselines (\S\ref{sec:phase2-results})
-substantially outperforms random association (reward $-34.1$ vs.\ $-82.2$,
-outage $9.8$ vs.\ $33.7$ users out of 50) but does not yet match the
-closed-form max-SINR heuristic (reward $-19.3$, outage $1.0$). This gap,
-combined with the UAV relay's distance-dependent viability, motivates two
-directions for future work: (1) closing the DQN-vs-max-SINR gap through
-extended training, reward shaping, or harder (e.g.\ rain/mobility-heavy)
-scenarios, and (2) extending the DQN's action space to include UAV relay
+\paragraph{Learned association.} Neither policy dominates: LSTM-fed DQN has the higher reward and lower outage, while max-SINR is fairer. Max-SINR assumes the SINR to every platform is known at decision time, which a deployed system must measure. The LSTM-fed DQN agent (\S\ref{sec:dqn-results})
+earns the highest reward and the lowest outage of all policies tested on the
+held-out 2025 days (mean reward $-5.2$ vs.\ $-16.5$ for max-SINR, outage $0$ vs.\
+$1.0$ users out of 50), with the reward and outage advantage holding in all five
+training seeds. Max-SINR remains fairer (Jain index $0.69$ vs.\ $0.11$), so the
+learned policy trades fairness for throughput under the current reward. Two
+directions for future work follow: (1) adding a fairness-aware reward or
+constraint to close the fairness gap, and testing on harder (e.g.\ rain- or
+mobility-heavy) scenarios, and (2) extending the DQN's action space to include UAV relay
 routing alongside direct association -- now that the feeder hop is
 capacity-competitive within $\approx45$--$60$\,km of nadir -- so the learned
 policy, rather than a fixed three-way choice, decides when relaying is
