@@ -1,0 +1,6 @@
+,reward_per_step,reward_per_step,jain,jain,outage,outage,soc,soc
+,mean,std,mean,std,mean,std,mean,std
+variant,,,,,,,,
+lstm,1.1421,0.6880,0.9726,0.0103,0.0000,0.0000,59.8929,0.5371
+none,0.6385,1.3395,0.9607,0.0269,0.0040,0.0089,59.8943,0.5697
+oracle,1.0343,0.7545,0.9798,0.0089,0.0000,0.0000,59.9073,0.5362

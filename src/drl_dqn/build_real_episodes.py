@@ -50,7 +50,7 @@ DATA_YEARS = [2023, 2024, 2025]
 TRAIN_YEARS = [2024]
 EVAL_YEAR = 2025
 EP_HOURS = 24
-N_TRAIN_EP = 400      # 300 + 100 more episodes (multi-seed run)
+N_TRAIN_EP = 400      # rolling 2024 training episodes (multi-seed run)
 N_EVAL_EP = 50        # paper's held-out episode count
 TRAIN_SEED = 0
 EVAL_SEED = 999
@@ -65,9 +65,13 @@ def load_hourly() -> pd.DataFrame:
     df = df.join(itur[["gas_att_db", "scint_att_db"]], how="left")
     # The LSTM's pred_h1 issued at hour t-1 is its forecast for hour t.
     lstm = pd.read_csv(LSTM_PATH, parse_dates=["issue_time_utc"]).set_index("issue_time_utc")
-    df["lstm_pred_h1"] = lstm["pred_h1"].reindex(df.index - pd.Timedelta(hours=1)).values
+    # All six horizons issued at hour t-1 (forecasts for hours t .. t+5). Issued before hour t,
+    # so the agent at hour t sees no rain of hour t.
+    horizons = [f"lstm_pred_h{h}" for h in range(1, 7)]
+    for h in range(1, 7):
+        df[f"lstm_pred_h{h}"] = lstm[f"pred_h{h}"].reindex(df.index - pd.Timedelta(hours=1)).values
     # The first 24 hours of 2023 have no LSTM forecast, so they are dropped.
-    return df.dropna(subset=["lstm_pred_h1"])
+    return df.dropna(subset=horizons)
 
 
 def is_consecutive(index: pd.DatetimeIndex, start: pd.Timestamp) -> bool:

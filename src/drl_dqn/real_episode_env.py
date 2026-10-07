@@ -40,22 +40,26 @@ def load_episodes(split: str, path: str = EPISODES_CSV) -> list[dict]:
             "vis_km": grp["vis_km"].fillna(10.0).values,
             "hour": grp["time_utc"].dt.hour.values.astype(float),
             "rain_att_db": grp["rain_att_db"].values,
-            "lstm_db": grp["lstm_pred_h1"].values,
+            "lstm_db": grp[[f"lstm_pred_h{h}" for h in range(1, 7)]].values,  # (hours, 6)
         })
     return episodes
 
 
 class RealEpisodeEnv(HAPSAssociationEnv):
-    def __init__(self, episodes, use_lstm=True, **kwargs):
+    def __init__(self, episodes, use_lstm=True, forecast="lstm", **kwargs):
+        # forecast: "lstm" (six LSTM horizons issued at t-1, the paper's model),
+        #           "none" (no forecast features, ablation), or
+        #           "oracle" (the true attenuation for hours t..t+5, an upper bound).
         super().__init__(weather_generator=None, **kwargs)
         self.episodes = episodes
-        self.use_lstm = use_lstm
+        self.forecast = forecast if use_lstm else "none"
+        self.use_lstm = self.forecast != "none"
         self._next = 0
         self.ep = None
         # The base class allocates its state with state_dim, so keep its width for slicing.
         self.base_state_dim = self.state_dim
-        if use_lstm:
-            self.state_dim += 1
+        if self.use_lstm:
+            self.state_dim += 6  # six forecast horizons for hours t..t+5
         self.rain_att_override_db = None
         # Original design: each HAPS relays through its own Gateway (no shared-capacity model).
         self.shared_gateway = False
@@ -70,13 +74,20 @@ class RealEpisodeEnv(HAPSAssociationEnv):
         )
         self.hour_of_day = float(ep["hour"][k])
         self.rain_att_override_db = float(ep["rain_att_db"][k])
-        self._lstm_db = float(ep["lstm_db"][k])
+        if self.forecast == "oracle":
+            true = np.asarray(ep["rain_att_db"][k:k + 6], dtype=float)
+            if len(true) < 6:  # pad the last hours of an episode with the final value
+                true = np.concatenate([true, np.full(6 - len(true), true[-1] if len(true) else 0.0)])
+            self._lstm_db = true
+        else:
+            self._lstm_db = np.asarray(ep["lstm_db"][k], dtype=float)  # (6,)
 
     def _states_real(self) -> np.ndarray:
         s = super()._states()[:, : self.base_state_dim]
         if self.use_lstm:
-            lstm_col = np.full((self.n_users, 1), np.clip(self._lstm_db / LSTM_DB_MAX, 0.0, 1.0))
-            s = np.hstack([s, lstm_col])
+            lstm_row = np.clip(self._lstm_db / LSTM_DB_MAX, 0.0, 1.0)
+            lstm_cols = np.tile(lstm_row, (self.n_users, 1))  # (n_users, 6), same forecast for all users
+            s = np.hstack([s, lstm_cols])
         return s
 
     def reset(self):

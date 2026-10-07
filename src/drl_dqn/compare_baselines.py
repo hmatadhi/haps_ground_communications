@@ -58,7 +58,9 @@ def make_prelstm_episodes(n_days: int, seed: int) -> list[dict]:
             "vis_km": np.full(MAX_STEPS, 10.0),
             "hour": np.arange(MAX_STEPS, dtype=float),
             "rain_att_db": att,
-            "lstm_db": att,
+            # Persistence surrogate for the six forecast horizons (PreLSTM days have no
+            # forecast; the baselines do not read the forecast features).
+            "lstm_db": np.repeat(att[:, None], 6, axis=1),
         })
     return episodes
 

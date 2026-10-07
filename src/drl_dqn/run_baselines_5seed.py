@@ -27,7 +27,7 @@ sys.path.insert(0, HERE)
 
 from real_episode_env import load_episodes  # noqa: E402
 from run_multiseed import OUT_DIR, SEEDS, evaluate  # noqa: E402
-from train_dqn_real import max_sinr_policy, random_policy  # noqa: E402
+from train_dqn_real import greedy_throughput_policy, max_sinr_policy, random_policy  # noqa: E402
 from compare_baselines import make_prelstm_episodes, N_PRELSTM_DAYS, PRELSTM_SEED  # noqa: E402
 
 BASELINES = [
@@ -35,6 +35,8 @@ BASELINES = [
     ("real", "max-SINR", lambda: max_sinr_policy),
     ("prelstm", "random", lambda: random_policy),
     ("prelstm", "max-SINR", lambda: max_sinr_policy),
+    ("real", "greedy-throughput", lambda: greedy_throughput_policy),
+    ("prelstm", "greedy-throughput", lambda: greedy_throughput_policy),
 ]
 
 

@@ -28,11 +28,10 @@ OUT_PATH = os.path.join(ROOT, "data", "processed", "figures", "policy_comparison
 
 # (label on the axis, colour)
 POLICIES = [
-    ("Random\n(real)", "0.6"),
-    ("Max-SINR\n(real)", "tab:orange"),
-    ("Random\n(PreLSTM)", "0.8"),
-    ("Max-SINR\n(PreLSTM)", "tab:brown"),
-    ("DQN with\nLSTM (real)", "tab:blue"),
+    ("Random", "0.6"),
+    ("Max-SINR\n(direct only)", "tab:orange"),
+    ("Greedy\nthroughput", "tab:olive"),
+    ("DQN with\nLSTM", "tab:blue"),
 ]
 METRICS = [
     ("reward_per_step", "Reward per step (higher is better)"),
@@ -45,11 +44,12 @@ def per_seed_table() -> pd.DataFrame:
     """One row per (policy, seed) with the metrics, in the order of POLICIES."""
     dqn = pd.read_csv(SEED_RESULTS)
     dqn = dqn[dqn["policy"] == "DQN with LSTM"]  # seed_results also holds baseline rows
-    dqn = dqn.assign(policy="DQN with\nLSTM (real)")[["policy", "seed", "reward_per_step", "jain", "outage"]]
+    dqn = dqn.assign(policy="DQN with\nLSTM")[["policy", "seed", "reward_per_step", "jain", "outage"]]
     base = pd.read_csv(BASELINES)
-    names = {("real", "random"): "Random\n(real)", ("real", "max-SINR"): "Max-SINR\n(real)",
-             ("prelstm", "random"): "Random\n(PreLSTM)", ("prelstm", "max-SINR"): "Max-SINR\n(PreLSTM)"}
-    base["policy"] = [names[(a, b)] for a, b in zip(base["eval_set"], base["base_policy"])]
+    base = base[base["eval_set"] == "real"]  # the real 2025 days only
+    names = {"random": "Random", "max-SINR": "Max-SINR\n(direct only)",
+             "greedy-throughput": "Greedy\nthroughput"}
+    base["policy"] = [names[b] for b in base["base_policy"]]
     base = base[["policy", "seed", "reward_per_step", "jain", "outage"]]
     return pd.concat([base, dqn], ignore_index=True)
 

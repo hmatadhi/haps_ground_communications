@@ -1,251 +1,251 @@
-reward_per_step,jain,outage,soc,policy,episode_id,regime
--65.7570,0.0887,22,55.2207,1 Phase1 random (real),400,mixed
--53.3944,0.1344,22,57.7953,1 Phase1 random (real),401,cloudy
--37.6870,0.0543,19,63.3708,1 Phase1 random (real),402,clear
--52.4328,0.0308,12,59.3110,1 Phase1 random (real),403,mixed
--39.5711,0.0526,17,63.3708,1 Phase1 random (real),404,clear
--42.9355,0.0866,20,63.3708,1 Phase1 random (real),405,clear
--41.2590,0.0303,11,62.5629,1 Phase1 random (real),406,mixed
--54.3863,0.0720,15,58.6220,1 Phase1 random (real),407,cloudy
--46.4935,0.0926,24,58.6629,1 Phase1 random (real),408,clear
--57.6396,0.0550,23,59.3277,1 Phase1 random (real),409,mixed
--51.1796,0.0632,17,59.2860,1 Phase1 random (real),410,cloudy
--39.4275,0.0428,18,63.3708,1 Phase1 random (real),411,cloudy
--50.3344,0.0829,13,60.1240,1 Phase1 random (real),412,clear
--48.4301,0.0791,18,59.3110,1 Phase1 random (real),413,clear
--52.9024,0.0343,17,58.6077,1 Phase1 random (real),414,clear
--43.8130,0.0211,23,62.5204,1 Phase1 random (real),415,rain
--53.2573,0.3205,21,59.3083,1 Phase1 random (real),416,clear
--44.0575,0.1585,13,62.5891,1 Phase1 random (real),417,clear
--52.6728,0.0271,21,59.3222,1 Phase1 random (real),418,mixed
--51.0061,0.0680,21,60.3256,1 Phase1 random (real),419,cloudy
--57.4924,0.0402,22,56.1905,1 Phase1 random (real),420,mixed
--40.4451,0.0545,25,63.3708,1 Phase1 random (real),421,mixed
--35.7675,0.0673,16,63.3708,1 Phase1 random (real),422,mixed
--39.6638,0.0721,24,63.3708,1 Phase1 random (real),423,rain
--41.0369,0.0247,19,61.7167,1 Phase1 random (real),424,cloudy
--51.6839,0.0822,22,58.7865,1 Phase1 random (real),425,cloudy
--51.2440,0.1221,21,59.2944,1 Phase1 random (real),426,rain
--66.0390,0.0709,15,55.2624,1 Phase1 random (real),427,cloudy
--37.8294,0.0909,19,62.6544,1 Phase1 random (real),428,rain
--46.0623,0.0554,22,59.3166,1 Phase1 random (real),429,mixed
--38.6447,0.0653,20,62.7427,1 Phase1 random (real),430,cloudy
--49.2864,0.1015,16,59.3110,1 Phase1 random (real),431,cloudy
--65.4453,0.0249,20,55.2513,1 Phase1 random (real),432,mixed
--58.9672,0.0386,19,56.3076,1 Phase1 random (real),433,cloudy
--48.1616,0.0242,21,59.3027,1 Phase1 random (real),434,rain
--53.7161,0.0819,17,58.9008,1 Phase1 random (real),435,rain
--46.2040,0.0931,25,61.9168,1 Phase1 random (real),436,rain
--67.6550,0.0788,28,55.2568,1 Phase1 random (real),437,mixed
--66.4288,0.0853,13,55.2596,1 Phase1 random (real),438,rain
--64.7055,0.0937,23,55.2735,1 Phase1 random (real),439,mixed
--41.2544,0.0242,17,63.3708,1 Phase1 random (real),440,clear
--64.4230,0.0539,18,55.2707,1 Phase1 random (real),441,clear
--50.0022,0.0796,19,59.2833,1 Phase1 random (real),442,cloudy
--61.9442,0.0224,23,56.0993,1 Phase1 random (real),443,clear
--56.6727,0.0457,20,57.6151,1 Phase1 random (real),444,clear
--55.2830,0.0201,21,58.1430,1 Phase1 random (real),445,clear
--49.3105,0.1006,21,59.3305,1 Phase1 random (real),446,clear
--46.7879,0.0611,17,59.3194,1 Phase1 random (real),447,clear
--63.9249,0.1320,21,55.2179,1 Phase1 random (real),448,clear
--53.3032,0.0618,20,59.2944,1 Phase1 random (real),449,clear
--27.6941,0.7058,0,55.7040,2 Phase1 max-SINR (real),400,mixed
--21.3650,0.6898,1,57.4342,2 Phase1 max-SINR (real),401,cloudy
--3.0109,0.7340,1,63.3708,2 Phase1 max-SINR (real),402,clear
--20.0387,0.6652,1,59.5249,2 Phase1 max-SINR (real),403,mixed
--4.1977,0.7096,0,63.3708,2 Phase1 max-SINR (real),404,clear
--5.5375,0.6589,0,63.3708,2 Phase1 max-SINR (real),405,clear
--9.2416,0.7013,1,61.8045,2 Phase1 max-SINR (real),406,mixed
--22.4895,0.6998,3,59.1248,2 Phase1 max-SINR (real),407,cloudy
--18.0737,0.6563,0,57.9518,2 Phase1 max-SINR (real),408,clear
--17.5673,0.6513,2,59.5749,2 Phase1 max-SINR (real),409,mixed
--16.4010,0.7027,0,59.5249,2 Phase1 max-SINR (real),410,cloudy
--5.4746,0.6973,1,63.3708,2 Phase1 max-SINR (real),411,cloudy
--15.8175,0.6829,1,60.4990,2 Phase1 max-SINR (real),412,clear
--14.3083,0.7576,0,59.5749,2 Phase1 max-SINR (real),413,clear
--19.6433,0.6738,2,58.2618,2 Phase1 max-SINR (real),414,clear
--9.5177,0.6730,3,63.1676,2 Phase1 max-SINR (real),415,rain
--17.2964,0.6544,0,59.4999,2 Phase1 max-SINR (real),416,clear
--11.0674,0.6859,4,63.1363,2 Phase1 max-SINR (real),417,clear
--13.5251,0.7169,0,59.5749,2 Phase1 max-SINR (real),418,mixed
--15.3990,0.6478,2,60.0672,2 Phase1 max-SINR (real),419,cloudy
--22.5994,0.7293,0,56.6405,2 Phase1 max-SINR (real),420,mixed
--5.9065,0.6831,1,63.3708,2 Phase1 max-SINR (real),421,mixed
--7.9141,0.6473,1,63.3708,2 Phase1 max-SINR (real),422,mixed
--6.7227,0.7147,1,63.3708,2 Phase1 max-SINR (real),423,rain
--8.4357,0.7200,0,62.1981,2 Phase1 max-SINR (real),424,cloudy
--19.6719,0.6548,1,59.3365,2 Phase1 max-SINR (real),425,cloudy
--17.9840,0.7130,2,59.4999,2 Phase1 max-SINR (real),426,rain
--27.7118,0.7069,0,54.9290,2 Phase1 max-SINR (real),427,cloudy
--3.4949,0.7662,0,63.0600,2 Phase1 max-SINR (real),428,rain
--16.3411,0.6593,2,59.5499,2 Phase1 max-SINR (real),429,mixed
--3.4964,0.7126,0,63.1093,2 Phase1 max-SINR (real),430,cloudy
--19.5191,0.6667,3,58.8249,2 Phase1 max-SINR (real),431,cloudy
--28.0378,0.6948,1,55.0040,2 Phase1 max-SINR (real),432,mixed
--26.2980,0.6739,3,55.9131,2 Phase1 max-SINR (real),433,cloudy
--16.8695,0.6694,0,58.8749,2 Phase1 max-SINR (real),434,rain
--13.0270,0.7225,0,58.7749,2 Phase1 max-SINR (real),435,rain
--10.5808,0.7210,2,62.3390,2 Phase1 max-SINR (real),436,rain
--27.2231,0.7350,0,54.9540,2 Phase1 max-SINR (real),437,mixed
--32.6752,0.6855,1,55.1040,2 Phase1 max-SINR (real),438,rain
--27.6966,0.7220,1,55.1790,2 Phase1 max-SINR (real),439,mixed
--6.7101,0.6699,1,63.3708,2 Phase1 max-SINR (real),440,clear
--28.8569,0.6953,1,55.6540,2 Phase1 max-SINR (real),441,clear
--19.9796,0.6802,3,59.4749,2 Phase1 max-SINR (real),442,cloudy
--24.6878,0.7229,0,55.9937,2 Phase1 max-SINR (real),443,clear
--19.7011,0.6704,0,57.1623,2 Phase1 max-SINR (real),444,clear
--22.5438,0.6510,1,57.6485,2 Phase1 max-SINR (real),445,clear
--16.2223,0.7077,3,58.9749,2 Phase1 max-SINR (real),446,clear
--11.8039,0.7390,0,58.9249,2 Phase1 max-SINR (real),447,clear
--28.8756,0.6783,0,54.9540,2 Phase1 max-SINR (real),448,clear
--14.6943,0.7149,1,59.5749,2 Phase1 max-SINR (real),449,clear
--62.5140,0.0814,23,55.2402,3 PreLSTM random,0,prelstm
--55.3861,0.0870,25,57.6369,3 PreLSTM random,1,prelstm
--38.7217,0.0358,25,63.3708,3 PreLSTM random,2,prelstm
--53.4048,0.0342,23,59.3027,3 PreLSTM random,3,prelstm
--41.0591,0.0781,29,63.3708,3 PreLSTM random,4,prelstm
--40.5281,0.0244,21,63.3708,3 PreLSTM random,5,prelstm
--42.6104,0.0686,24,62.6712,3 PreLSTM random,6,prelstm
--52.2110,0.0693,25,58.5914,3 PreLSTM random,7,prelstm
--45.5942,0.2905,19,58.6518,3 PreLSTM random,8,prelstm
--57.5676,0.0273,17,59.3138,3 PreLSTM random,9,prelstm
--50.5331,0.0762,21,59.3194,3 PreLSTM random,10,prelstm
--39.1503,0.0638,25,63.3708,3 PreLSTM random,11,prelstm
--49.2135,0.0983,17,60.1156,3 PreLSTM random,12,prelstm
--47.6708,0.0993,14,59.2694,3 PreLSTM random,13,prelstm
--50.6285,0.0705,17,58.6688,3 PreLSTM random,14,prelstm
--45.4352,0.1028,22,62.4371,3 PreLSTM random,15,prelstm
--52.9173,0.1097,23,59.2944,3 PreLSTM random,16,prelstm
--39.6395,0.0724,22,62.6586,3 PreLSTM random,17,prelstm
--50.1827,0.1324,20,59.3277,3 PreLSTM random,18,prelstm
--51.2082,0.0276,20,60.4089,3 PreLSTM random,19,prelstm
--60.4973,0.0210,27,56.1266,3 PreLSTM random,20,prelstm
--39.9242,0.1128,22,63.3708,3 PreLSTM random,21,prelstm
--36.9488,0.1013,20,63.3708,3 PreLSTM random,22,prelstm
--40.1745,0.0672,23,63.3708,3 PreLSTM random,23,prelstm
--42.8161,0.0476,16,61.7195,3 PreLSTM random,24,prelstm
--52.3072,0.0230,14,58.8059,3 PreLSTM random,25,prelstm
--50.6926,0.0730,19,59.3166,3 PreLSTM random,26,prelstm
--67.0728,0.0912,20,55.2513,3 PreLSTM random,27,prelstm
--39.4106,0.0720,24,62.6183,3 PreLSTM random,28,prelstm
--47.8956,0.0613,17,59.2555,3 PreLSTM random,29,prelstm
--39.8274,0.1265,17,62.7399,3 PreLSTM random,30,prelstm
--48.7136,0.0516,22,59.3027,3 PreLSTM random,31,prelstm
--63.8501,0.0306,16,55.2652,3 PreLSTM random,32,prelstm
--53.8022,0.0635,19,56.3242,3 PreLSTM random,33,prelstm
--47.6811,0.1210,14,59.2916,3 PreLSTM random,34,prelstm
--49.4169,0.0793,21,58.9147,3 PreLSTM random,35,prelstm
--44.6549,0.0893,24,61.8390,3 PreLSTM random,36,prelstm
--66.8162,0.0929,25,55.2402,3 PreLSTM random,37,prelstm
--64.9147,0.0836,18,55.2179,3 PreLSTM random,38,prelstm
--63.0036,0.1246,21,55.2346,3 PreLSTM random,39,prelstm
--41.1051,0.0389,18,63.3708,3 PreLSTM random,40,prelstm
--63.3596,0.0917,19,55.3013,3 PreLSTM random,41,prelstm
--50.8163,0.1085,22,59.3138,3 PreLSTM random,42,prelstm
--62.6615,0.0276,22,56.0021,3 PreLSTM random,43,prelstm
--55.2380,0.0389,19,57.6595,3 PreLSTM random,44,prelstm
--55.1864,0.0201,18,58.1180,3 PreLSTM random,45,prelstm
--46.9764,0.0858,24,59.3333,3 PreLSTM random,46,prelstm
--48.7612,0.1523,18,59.3027,3 PreLSTM random,47,prelstm
--66.0503,0.0387,25,55.2652,3 PreLSTM random,48,prelstm
--52.1811,0.0711,27,59.2944,3 PreLSTM random,49,prelstm
--27.6941,0.7058,0,55.7040,4 PreLSTM max-SINR,0,prelstm
--21.3440,0.6898,1,57.4342,4 PreLSTM max-SINR,1,prelstm
--3.0109,0.7340,1,63.3708,4 PreLSTM max-SINR,2,prelstm
--20.0370,0.6652,1,59.5249,4 PreLSTM max-SINR,3,prelstm
--4.1977,0.7096,0,63.3708,4 PreLSTM max-SINR,4,prelstm
--5.5375,0.6589,0,63.3708,4 PreLSTM max-SINR,5,prelstm
--9.2416,0.7013,1,61.8045,4 PreLSTM max-SINR,6,prelstm
--22.4685,0.6998,3,59.1248,4 PreLSTM max-SINR,7,prelstm
--18.0737,0.6563,0,57.9518,4 PreLSTM max-SINR,8,prelstm
--17.5804,0.6513,2,59.5749,4 PreLSTM max-SINR,9,prelstm
--16.3981,0.7027,0,59.5249,4 PreLSTM max-SINR,10,prelstm
--5.4761,0.6973,1,63.3708,4 PreLSTM max-SINR,11,prelstm
--15.8175,0.6829,1,60.4990,4 PreLSTM max-SINR,12,prelstm
--14.3083,0.7576,0,59.5749,4 PreLSTM max-SINR,13,prelstm
--19.6521,0.6738,2,58.2618,4 PreLSTM max-SINR,14,prelstm
--9.4835,0.6730,3,63.1676,4 PreLSTM max-SINR,15,prelstm
--17.2964,0.6544,0,59.4999,4 PreLSTM max-SINR,16,prelstm
--11.0674,0.6859,4,63.1363,4 PreLSTM max-SINR,17,prelstm
--13.5251,0.7169,0,59.5749,4 PreLSTM max-SINR,18,prelstm
--15.3990,0.6478,2,60.0672,4 PreLSTM max-SINR,19,prelstm
--22.5882,0.7293,0,56.6405,4 PreLSTM max-SINR,20,prelstm
--5.9065,0.6831,1,63.3708,4 PreLSTM max-SINR,21,prelstm
--7.9141,0.6473,1,63.3708,4 PreLSTM max-SINR,22,prelstm
--6.6548,0.7147,1,63.3708,4 PreLSTM max-SINR,23,prelstm
--8.4167,0.7200,0,62.1981,4 PreLSTM max-SINR,24,prelstm
--19.6650,0.6548,1,59.3365,4 PreLSTM max-SINR,25,prelstm
--17.9048,0.7130,2,59.4999,4 PreLSTM max-SINR,26,prelstm
--27.6986,0.7069,0,54.9290,4 PreLSTM max-SINR,27,prelstm
--3.4085,0.7662,0,63.0600,4 PreLSTM max-SINR,28,prelstm
--16.2922,0.6593,2,59.5499,4 PreLSTM max-SINR,29,prelstm
--3.4551,0.7126,0,63.1093,4 PreLSTM max-SINR,30,prelstm
--19.5411,0.6667,3,58.8249,4 PreLSTM max-SINR,31,prelstm
--28.0378,0.6948,1,55.0040,4 PreLSTM max-SINR,32,prelstm
--26.2804,0.6739,3,55.9131,4 PreLSTM max-SINR,33,prelstm
--16.8147,0.6694,0,58.8749,4 PreLSTM max-SINR,34,prelstm
--12.7070,0.7225,0,58.7749,4 PreLSTM max-SINR,35,prelstm
--10.4221,0.7210,2,62.3390,4 PreLSTM max-SINR,36,prelstm
--27.2202,0.7350,0,54.9540,4 PreLSTM max-SINR,37,prelstm
--32.5744,0.6855,1,55.1040,4 PreLSTM max-SINR,38,prelstm
--27.6966,0.7220,1,55.1790,4 PreLSTM max-SINR,39,prelstm
--6.7101,0.6699,1,63.3708,4 PreLSTM max-SINR,40,prelstm
--28.8680,0.6953,1,55.6540,4 PreLSTM max-SINR,41,prelstm
--19.9796,0.6802,3,59.4749,4 PreLSTM max-SINR,42,prelstm
--24.6878,0.7229,0,55.9937,4 PreLSTM max-SINR,43,prelstm
--19.7011,0.6704,0,57.1623,4 PreLSTM max-SINR,44,prelstm
--22.5567,0.6510,1,57.6485,4 PreLSTM max-SINR,45,prelstm
--16.2223,0.7077,3,58.9749,4 PreLSTM max-SINR,46,prelstm
--11.8039,0.7390,0,58.9249,4 PreLSTM max-SINR,47,prelstm
--28.8756,0.6783,0,54.9540,4 PreLSTM max-SINR,48,prelstm
--14.7257,0.7149,1,59.5749,4 PreLSTM max-SINR,49,prelstm
--22.4750,0.0218,0,55.6513,5 DQN with LSTM (real),400,mixed
--12.3425,0.0262,0,57.2230,5 DQN with LSTM (real),401,cloudy
-2.7839,0.0254,0,63.3708,5 DQN with LSTM (real),402,clear
--10.0071,0.0208,0,59.4722,5 DQN with LSTM (real),403,mixed
-2.8579,0.0557,0,63.3708,5 DQN with LSTM (real),404,clear
-2.3307,0.0459,0,63.3708,5 DQN with LSTM (real),405,clear
--1.6173,0.1444,0,62.0267,5 DQN with LSTM (real),406,mixed
--10.3029,0.1069,0,59.0775,5 DQN with LSTM (real),407,cloudy
--10.0693,0.0856,0,58.0796,5 DQN with LSTM (real),408,clear
--10.0270,0.0496,0,59.5194,5 DQN with LSTM (real),409,mixed
--10.0180,0.0464,0,59.4638,5 DQN with LSTM (real),410,cloudy
-2.5691,0.0877,0,63.3708,5 DQN with LSTM (real),411,cloudy
--5.7367,0.0439,0,60.4490,5 DQN with LSTM (real),412,clear
--7.9008,0.1872,0,59.5666,5 DQN with LSTM (real),413,clear
--10.0896,0.0906,0,58.2507,5 DQN with LSTM (real),414,clear
-2.5718,0.0360,0,63.0843,5 DQN with LSTM (real),415,rain
--10.2883,0.0329,0,59.4777,5 DQN with LSTM (real),416,clear
-2.6322,0.0429,0,63.1641,5 DQN with LSTM (real),417,clear
--7.9308,0.0236,0,59.5888,5 DQN with LSTM (real),418,mixed
--3.8443,0.0303,0,60.2811,5 DQN with LSTM (real),419,cloudy
--16.0886,0.0328,0,56.7211,5 DQN with LSTM (real),420,mixed
-2.5455,0.0580,0,63.3708,5 DQN with LSTM (real),421,mixed
-2.6698,0.0799,0,63.3708,5 DQN with LSTM (real),422,mixed
-2.3331,0.0445,0,63.3708,5 DQN with LSTM (real),423,rain
--1.4579,0.0428,0,62.1314,5 DQN with LSTM (real),424,cloudy
--10.1044,0.0258,0,59.2587,5 DQN with LSTM (real),425,cloudy
--8.1873,0.0346,0,59.4777,5 DQN with LSTM (real),426,rain
--22.3444,0.0417,0,54.9679,5 DQN with LSTM (real),427,cloudy
-2.3212,0.2892,0,63.0350,5 DQN with LSTM (real),428,rain
--5.9475,0.0251,0,59.3972,5 DQN with LSTM (real),429,mixed
-2.4557,0.2110,0,63.0010,5 DQN with LSTM (real),430,cloudy
--7.7339,0.0469,0,58.9944,5 DQN with LSTM (real),431,cloudy
--20.3831,0.0210,0,55.0485,5 DQN with LSTM (real),432,mixed
--16.2662,0.0751,0,55.8770,5 DQN with LSTM (real),433,cloudy
--9.9242,0.0368,0,58.9499,5 DQN with LSTM (real),434,rain
--9.0004,0.0255,0,58.8184,5 DQN with LSTM (real),435,rain
--2.1101,0.0243,0,62.2779,5 DQN with LSTM (real),436,rain
--20.6885,0.1737,0,55.0652,5 DQN with LSTM (real),437,mixed
--23.0848,0.1855,0,55.1707,5 DQN with LSTM (real),438,rain
--22.4044,0.0369,0,55.2040,5 DQN with LSTM (real),439,mixed
-2.5537,0.0817,0,63.3708,5 DQN with LSTM (real),440,clear
--20.4282,0.0201,0,55.5540,5 DQN with LSTM (real),441,clear
--8.0808,0.1603,0,59.3083,5 DQN with LSTM (real),442,cloudy
--18.2022,0.0306,0,56.1854,5 DQN with LSTM (real),443,clear
--12.0749,0.0221,0,57.2567,5 DQN with LSTM (real),444,clear
--11.9804,0.0214,0,57.6513,5 DQN with LSTM (real),445,clear
--5.7417,0.0581,0,59.1083,5 DQN with LSTM (real),446,clear
--5.7159,0.0765,0,58.9916,5 DQN with LSTM (real),447,clear
--20.5749,0.0326,0,54.9596,5 DQN with LSTM (real),448,clear
--8.0078,0.0833,0,59.5472,5 DQN with LSTM (real),449,clear
+reward_per_step,jain,jain_sinr,outage,soc,policy,episode_id,regime
+-45.6652,0.6188,0.2702,10,55.2207,1 Phase1 random (real),400,mixed
+-33.8784,0.6061,0.2079,12,57.7953,1 Phase1 random (real),401,cloudy
+-19.4492,0.5612,0.2294,12,63.3708,1 Phase1 random (real),402,clear
+-33.1451,0.6828,0.1472,4,59.3110,1 Phase1 random (real),403,mixed
+-20.8229,0.6079,0.2189,8,63.3708,1 Phase1 random (real),404,clear
+-21.4881,0.6807,0.2642,6,63.3708,1 Phase1 random (real),405,clear
+-22.2300,0.5394,0.1785,7,62.5629,1 Phase1 random (real),406,mixed
+-33.3475,0.6814,0.2137,4,58.6220,1 Phase1 random (real),407,cloudy
+-28.1808,0.5087,0.1779,15,58.6629,1 Phase1 random (real),408,clear
+-31.9113,0.6476,0.2494,7,59.3277,1 Phase1 random (real),409,mixed
+-33.4889,0.5305,0.1607,10,59.2860,1 Phase1 random (real),410,cloudy
+-19.6657,0.5486,0.1238,12,63.3708,1 Phase1 random (real),411,cloudy
+-30.9387,0.6090,0.2123,6,60.1240,1 Phase1 random (real),412,clear
+-30.6272,0.6436,0.1616,8,59.3110,1 Phase1 random (real),413,clear
+-31.9274,0.5595,0.1191,10,58.6077,1 Phase1 random (real),414,clear
+-23.3056,0.6467,0.0283,8,62.5204,1 Phase1 random (real),415,rain
+-33.6419,0.5720,0.2174,11,59.3083,1 Phase1 random (real),416,clear
+-25.1267,0.5493,0.2188,10,62.5891,1 Phase1 random (real),417,clear
+-30.1591,0.6738,0.1511,7,59.3222,1 Phase1 random (real),418,mixed
+-27.6764,0.6517,0.1818,6,60.3256,1 Phase1 random (real),419,cloudy
+-38.0618,0.5067,0.0857,14,56.1905,1 Phase1 random (real),420,mixed
+-20.7291,0.5569,0.1762,14,63.3708,1 Phase1 random (real),421,mixed
+-19.1796,0.6181,0.1757,7,63.3708,1 Phase1 random (real),422,mixed
+-18.1766,0.5830,0.1558,13,63.3708,1 Phase1 random (real),423,rain
+-23.9128,0.5654,0.0585,10,61.7167,1 Phase1 random (real),424,cloudy
+-33.1808,0.5189,0.1055,14,58.7865,1 Phase1 random (real),425,cloudy
+-29.6347,0.6531,0.2895,9,59.2944,1 Phase1 random (real),426,rain
+-43.9300,0.6274,0.2037,6,55.2624,1 Phase1 random (real),427,cloudy
+-19.2483,0.6411,0.1732,7,62.6544,1 Phase1 random (real),428,rain
+-27.7682,0.5808,0.2234,12,59.3166,1 Phase1 random (real),429,mixed
+-19.4485,0.5214,0.1586,13,62.7427,1 Phase1 random (real),430,cloudy
+-29.1654,0.5764,0.1688,9,59.3110,1 Phase1 random (real),431,cloudy
+-43.4392,0.5751,0.0711,10,55.2513,1 Phase1 random (real),432,mixed
+-40.2123,0.5820,0.1012,11,56.3076,1 Phase1 random (real),433,cloudy
+-30.9837,0.6249,0.0296,9,59.3027,1 Phase1 random (real),434,rain
+-33.3545,0.5420,0.1537,10,58.9008,1 Phase1 random (real),435,rain
+-24.5285,0.5767,0.1611,14,61.9168,1 Phase1 random (real),436,rain
+-44.2274,0.5258,0.1728,15,55.2568,1 Phase1 random (real),437,mixed
+-45.5359,0.6354,0.2164,4,55.2596,1 Phase1 random (real),438,rain
+-42.8379,0.5630,0.1609,11,55.2735,1 Phase1 random (real),439,mixed
+-20.7299,0.5957,0.0841,9,63.3708,1 Phase1 random (real),440,clear
+-44.8289,0.5593,0.1750,11,55.2707,1 Phase1 random (real),441,clear
+-29.8431,0.5473,0.2044,13,59.2833,1 Phase1 random (real),442,cloudy
+-39.7014,0.4975,0.1013,14,56.0993,1 Phase1 random (real),443,clear
+-35.6419,0.5459,0.1530,12,57.6151,1 Phase1 random (real),444,clear
+-35.4660,0.5124,0.0211,13,58.1430,1 Phase1 random (real),445,clear
+-31.1245,0.6594,0.2316,9,59.3305,1 Phase1 random (real),446,clear
+-30.4952,0.5634,0.1935,11,59.3194,1 Phase1 random (real),447,clear
+-45.1447,0.4913,0.0672,14,55.2179,1 Phase1 random (real),448,clear
+-31.0195,0.5893,0.1852,8,59.2944,1 Phase1 random (real),449,clear
+-27.6941,0.8733,0.7058,0,55.7040,2 Phase1 max-SINR (real),400,mixed
+-21.3650,0.8611,0.6898,1,57.4342,2 Phase1 max-SINR (real),401,cloudy
+-3.0109,0.8880,0.7340,1,63.3708,2 Phase1 max-SINR (real),402,clear
+-20.0387,0.8433,0.6652,1,59.5249,2 Phase1 max-SINR (real),403,mixed
+-4.1977,0.8618,0.7096,0,63.3708,2 Phase1 max-SINR (real),404,clear
+-5.5375,0.8460,0.6589,0,63.3708,2 Phase1 max-SINR (real),405,clear
+-9.2416,0.8678,0.7013,1,61.8045,2 Phase1 max-SINR (real),406,mixed
+-22.4895,0.8657,0.6998,3,59.1248,2 Phase1 max-SINR (real),407,cloudy
+-18.0737,0.8469,0.6563,0,57.9518,2 Phase1 max-SINR (real),408,clear
+-17.5673,0.8481,0.6513,2,59.5749,2 Phase1 max-SINR (real),409,mixed
+-16.4010,0.8682,0.7027,0,59.5249,2 Phase1 max-SINR (real),410,cloudy
+-5.4746,0.8651,0.6973,1,63.3708,2 Phase1 max-SINR (real),411,cloudy
+-15.8175,0.8471,0.6829,1,60.4990,2 Phase1 max-SINR (real),412,clear
+-14.3083,0.8958,0.7576,0,59.5749,2 Phase1 max-SINR (real),413,clear
+-19.6433,0.8546,0.6738,2,58.2618,2 Phase1 max-SINR (real),414,clear
+-9.5177,0.8441,0.6730,3,63.1676,2 Phase1 max-SINR (real),415,rain
+-17.2964,0.8612,0.6544,0,59.4999,2 Phase1 max-SINR (real),416,clear
+-11.0674,0.8500,0.6859,4,63.1363,2 Phase1 max-SINR (real),417,clear
+-13.5251,0.8857,0.7169,0,59.5749,2 Phase1 max-SINR (real),418,mixed
+-15.3990,0.8302,0.6478,2,60.0672,2 Phase1 max-SINR (real),419,cloudy
+-22.5994,0.8745,0.7293,0,56.6405,2 Phase1 max-SINR (real),420,mixed
+-5.9065,0.8566,0.6831,1,63.3708,2 Phase1 max-SINR (real),421,mixed
+-7.9141,0.8320,0.6473,1,63.3708,2 Phase1 max-SINR (real),422,mixed
+-6.7227,0.8672,0.7147,1,63.3708,2 Phase1 max-SINR (real),423,rain
+-8.4357,0.8704,0.7200,0,62.1981,2 Phase1 max-SINR (real),424,cloudy
+-19.6719,0.8424,0.6548,1,59.3365,2 Phase1 max-SINR (real),425,cloudy
+-17.9840,0.8652,0.7130,2,59.4999,2 Phase1 max-SINR (real),426,rain
+-27.7118,0.8654,0.7069,0,54.9290,2 Phase1 max-SINR (real),427,cloudy
+-3.4949,0.8877,0.7662,0,63.0600,2 Phase1 max-SINR (real),428,rain
+-16.3411,0.8475,0.6593,2,59.5499,2 Phase1 max-SINR (real),429,mixed
+-3.4964,0.8705,0.7126,0,63.1093,2 Phase1 max-SINR (real),430,cloudy
+-19.5191,0.8402,0.6667,3,58.8249,2 Phase1 max-SINR (real),431,cloudy
+-28.0378,0.8693,0.6948,1,55.0040,2 Phase1 max-SINR (real),432,mixed
+-26.2980,0.8561,0.6739,3,55.9131,2 Phase1 max-SINR (real),433,cloudy
+-16.8695,0.8530,0.6694,0,58.8749,2 Phase1 max-SINR (real),434,rain
+-13.0270,0.8751,0.7225,0,58.7749,2 Phase1 max-SINR (real),435,rain
+-10.5808,0.8681,0.7210,2,62.3390,2 Phase1 max-SINR (real),436,rain
+-27.2231,0.8813,0.7350,0,54.9540,2 Phase1 max-SINR (real),437,mixed
+-32.6752,0.8571,0.6855,1,55.1040,2 Phase1 max-SINR (real),438,rain
+-27.6966,0.8913,0.7220,1,55.1790,2 Phase1 max-SINR (real),439,mixed
+-6.7101,0.8550,0.6699,1,63.3708,2 Phase1 max-SINR (real),440,clear
+-28.8569,0.8658,0.6953,1,55.6540,2 Phase1 max-SINR (real),441,clear
+-19.9796,0.8591,0.6802,3,59.4749,2 Phase1 max-SINR (real),442,cloudy
+-24.6878,0.8754,0.7229,0,55.9937,2 Phase1 max-SINR (real),443,clear
+-19.7011,0.8531,0.6704,0,57.1623,2 Phase1 max-SINR (real),444,clear
+-22.5438,0.8424,0.6510,1,57.6485,2 Phase1 max-SINR (real),445,clear
+-16.2223,0.8660,0.7077,3,58.9749,2 Phase1 max-SINR (real),446,clear
+-11.8039,0.8864,0.7390,0,58.9249,2 Phase1 max-SINR (real),447,clear
+-28.8756,0.8570,0.6783,0,54.9540,2 Phase1 max-SINR (real),448,clear
+-14.6943,0.8789,0.7149,1,59.5749,2 Phase1 max-SINR (real),449,clear
+-43.5704,0.5990,0.2183,11,55.2402,3 PreLSTM random,0,prelstm
+-34.7239,0.5628,0.1605,14,57.6369,3 PreLSTM random,1,prelstm
+-19.2989,0.5138,0.1610,16,63.3708,3 PreLSTM random,2,prelstm
+-33.7775,0.6167,0.2314,10,59.3027,3 PreLSTM random,3,prelstm
+-19.2872,0.6602,0.2520,11,63.3708,3 PreLSTM random,4,prelstm
+-18.8709,0.6196,0.0718,11,63.3708,3 PreLSTM random,5,prelstm
+-21.1478,0.6782,0.2558,10,62.6712,3 PreLSTM random,6,prelstm
+-31.7905,0.4232,0.1019,19,58.5914,3 PreLSTM random,7,prelstm
+-29.3327,0.5334,0.1821,13,58.6518,3 PreLSTM random,8,prelstm
+-33.3888,0.6186,0.1346,7,59.3138,3 PreLSTM random,9,prelstm
+-32.6046,0.6034,0.2221,10,59.3194,3 PreLSTM random,10,prelstm
+-18.2438,0.6566,0.2132,9,63.3708,3 PreLSTM random,11,prelstm
+-29.8419,0.6141,0.2602,9,60.1156,3 PreLSTM random,12,prelstm
+-31.1392,0.6149,0.1898,7,59.2694,3 PreLSTM random,13,prelstm
+-30.1530,0.5904,0.2414,10,58.6688,3 PreLSTM random,14,prelstm
+-24.0765,0.5587,0.2500,13,62.4371,3 PreLSTM random,15,prelstm
+-31.3935,0.6053,0.2117,13,59.2944,3 PreLSTM random,16,prelstm
+-18.2217,0.6351,0.1794,9,62.6586,3 PreLSTM random,17,prelstm
+-31.1900,0.6441,0.1931,7,59.3277,3 PreLSTM random,18,prelstm
+-28.4761,0.5305,0.0644,11,60.4089,3 PreLSTM random,19,prelstm
+-39.3864,0.4665,0.0294,16,56.1266,3 PreLSTM random,20,prelstm
+-20.6791,0.5911,0.1820,9,63.3708,3 PreLSTM random,21,prelstm
+-19.1926,0.6320,0.3001,11,63.3708,3 PreLSTM random,22,prelstm
+-20.2130,0.5569,0.1846,13,63.3708,3 PreLSTM random,23,prelstm
+-25.9052,0.5425,0.1073,11,61.7195,3 PreLSTM random,24,prelstm
+-32.9702,0.6375,0.0553,6,58.8059,3 PreLSTM random,25,prelstm
+-30.5506,0.5799,0.1721,10,59.3166,3 PreLSTM random,26,prelstm
+-44.8529,0.5528,0.1581,13,55.2513,3 PreLSTM random,27,prelstm
+-20.5112,0.5582,0.1476,12,62.6183,3 PreLSTM random,28,prelstm
+-27.6153,0.5549,0.2047,10,59.2555,3 PreLSTM random,29,prelstm
+-21.5515,0.6247,0.2241,6,62.7399,3 PreLSTM random,30,prelstm
+-29.2686,0.5378,0.1968,13,59.3027,3 PreLSTM random,31,prelstm
+-43.3052,0.5193,0.0959,11,55.2652,3 PreLSTM random,32,prelstm
+-37.7477,0.6124,0.1651,8,56.3242,3 PreLSTM random,33,prelstm
+-32.5139,0.6136,0.2285,9,59.2916,3 PreLSTM random,34,prelstm
+-28.7741,0.5287,0.1406,12,58.9147,3 PreLSTM random,35,prelstm
+-25.2993,0.4978,0.1793,17,61.8390,3 PreLSTM random,36,prelstm
+-44.4548,0.5443,0.1289,14,55.2402,3 PreLSTM random,37,prelstm
+-44.8008,0.5046,0.1272,10,55.2179,3 PreLSTM random,38,prelstm
+-43.2131,0.5728,0.1943,9,55.2346,3 PreLSTM random,39,prelstm
+-21.1323,0.5770,0.1820,9,63.3708,3 PreLSTM random,40,prelstm
+-44.5743,0.5672,0.2281,10,55.3013,3 PreLSTM random,41,prelstm
+-29.6546,0.5195,0.2072,15,59.3138,3 PreLSTM random,42,prelstm
+-42.7805,0.5070,0.0352,16,56.0021,3 PreLSTM random,43,prelstm
+-35.4569,0.5393,0.1494,13,57.6595,3 PreLSTM random,44,prelstm
+-33.6370,0.5436,0.0213,8,58.1180,3 PreLSTM random,45,prelstm
+-27.6719,0.4877,0.1766,16,59.3333,3 PreLSTM random,46,prelstm
+-31.8934,0.6112,0.2687,10,59.3027,3 PreLSTM random,47,prelstm
+-43.7149,0.6286,0.1690,10,55.2652,3 PreLSTM random,48,prelstm
+-32.0482,0.5514,0.1870,17,59.2944,3 PreLSTM random,49,prelstm
+-27.6941,0.8733,0.7058,0,55.7040,4 PreLSTM max-SINR,0,prelstm
+-21.3440,0.8611,0.6898,1,57.4342,4 PreLSTM max-SINR,1,prelstm
+-3.0109,0.8880,0.7340,1,63.3708,4 PreLSTM max-SINR,2,prelstm
+-20.0370,0.8433,0.6652,1,59.5249,4 PreLSTM max-SINR,3,prelstm
+-4.1977,0.8618,0.7096,0,63.3708,4 PreLSTM max-SINR,4,prelstm
+-5.5375,0.8460,0.6589,0,63.3708,4 PreLSTM max-SINR,5,prelstm
+-9.2416,0.8678,0.7013,1,61.8045,4 PreLSTM max-SINR,6,prelstm
+-22.4685,0.8657,0.6998,3,59.1248,4 PreLSTM max-SINR,7,prelstm
+-18.0737,0.8469,0.6563,0,57.9518,4 PreLSTM max-SINR,8,prelstm
+-17.5804,0.8481,0.6513,2,59.5749,4 PreLSTM max-SINR,9,prelstm
+-16.3981,0.8682,0.7027,0,59.5249,4 PreLSTM max-SINR,10,prelstm
+-5.4761,0.8651,0.6973,1,63.3708,4 PreLSTM max-SINR,11,prelstm
+-15.8175,0.8471,0.6829,1,60.4990,4 PreLSTM max-SINR,12,prelstm
+-14.3083,0.8958,0.7576,0,59.5749,4 PreLSTM max-SINR,13,prelstm
+-19.6521,0.8546,0.6738,2,58.2618,4 PreLSTM max-SINR,14,prelstm
+-9.4835,0.8441,0.6730,3,63.1676,4 PreLSTM max-SINR,15,prelstm
+-17.2964,0.8612,0.6544,0,59.4999,4 PreLSTM max-SINR,16,prelstm
+-11.0674,0.8500,0.6859,4,63.1363,4 PreLSTM max-SINR,17,prelstm
+-13.5251,0.8857,0.7169,0,59.5749,4 PreLSTM max-SINR,18,prelstm
+-15.3990,0.8302,0.6478,2,60.0672,4 PreLSTM max-SINR,19,prelstm
+-22.5882,0.8745,0.7293,0,56.6405,4 PreLSTM max-SINR,20,prelstm
+-5.9065,0.8566,0.6831,1,63.3708,4 PreLSTM max-SINR,21,prelstm
+-7.9141,0.8320,0.6473,1,63.3708,4 PreLSTM max-SINR,22,prelstm
+-6.6548,0.8672,0.7147,1,63.3708,4 PreLSTM max-SINR,23,prelstm
+-8.4167,0.8704,0.7200,0,62.1981,4 PreLSTM max-SINR,24,prelstm
+-19.6650,0.8424,0.6548,1,59.3365,4 PreLSTM max-SINR,25,prelstm
+-17.9048,0.8652,0.7130,2,59.4999,4 PreLSTM max-SINR,26,prelstm
+-27.6986,0.8654,0.7069,0,54.9290,4 PreLSTM max-SINR,27,prelstm
+-3.4085,0.8877,0.7662,0,63.0600,4 PreLSTM max-SINR,28,prelstm
+-16.2922,0.8475,0.6593,2,59.5499,4 PreLSTM max-SINR,29,prelstm
+-3.4551,0.8705,0.7126,0,63.1093,4 PreLSTM max-SINR,30,prelstm
+-19.5411,0.8402,0.6667,3,58.8249,4 PreLSTM max-SINR,31,prelstm
+-28.0378,0.8693,0.6948,1,55.0040,4 PreLSTM max-SINR,32,prelstm
+-26.2804,0.8561,0.6739,3,55.9131,4 PreLSTM max-SINR,33,prelstm
+-16.8147,0.8530,0.6694,0,58.8749,4 PreLSTM max-SINR,34,prelstm
+-12.7070,0.8751,0.7225,0,58.7749,4 PreLSTM max-SINR,35,prelstm
+-10.4221,0.8681,0.7210,2,62.3390,4 PreLSTM max-SINR,36,prelstm
+-27.2202,0.8813,0.7350,0,54.9540,4 PreLSTM max-SINR,37,prelstm
+-32.5744,0.8571,0.6855,1,55.1040,4 PreLSTM max-SINR,38,prelstm
+-27.6966,0.8913,0.7220,1,55.1790,4 PreLSTM max-SINR,39,prelstm
+-6.7101,0.8550,0.6699,1,63.3708,4 PreLSTM max-SINR,40,prelstm
+-28.8680,0.8658,0.6953,1,55.6540,4 PreLSTM max-SINR,41,prelstm
+-19.9796,0.8591,0.6802,3,59.4749,4 PreLSTM max-SINR,42,prelstm
+-24.6878,0.8754,0.7229,0,55.9937,4 PreLSTM max-SINR,43,prelstm
+-19.7011,0.8531,0.6704,0,57.1623,4 PreLSTM max-SINR,44,prelstm
+-22.5567,0.8424,0.6510,1,57.6485,4 PreLSTM max-SINR,45,prelstm
+-16.2223,0.8660,0.7077,3,58.9749,4 PreLSTM max-SINR,46,prelstm
+-11.8039,0.8864,0.7390,0,58.9249,4 PreLSTM max-SINR,47,prelstm
+-28.8756,0.8570,0.6783,0,54.9540,4 PreLSTM max-SINR,48,prelstm
+-14.7257,0.8789,0.7149,1,59.5749,4 PreLSTM max-SINR,49,prelstm
+-7.6830,0.9866,0.7422,0,55.6457,5 DQN with LSTM (real),400,mixed
+-7.9556,0.9823,0.6575,0,57.4477,5 DQN with LSTM (real),401,cloudy
+4.9794,0.9902,0.7969,0,63.3708,5 DQN with LSTM (real),402,clear
+-4.0563,0.9843,0.6767,0,59.7249,5 DQN with LSTM (real),403,mixed
+3.5141,0.9864,0.7132,0,63.3708,5 DQN with LSTM (real),404,clear
+3.4859,0.9844,0.6770,0,63.3708,5 DQN with LSTM (real),405,clear
+1.4912,0.9862,0.6616,0,61.6879,5 DQN with LSTM (real),406,mixed
+1.6795,0.9850,0.7081,0,59.0942,5 DQN with LSTM (real),407,cloudy
+-6.6369,0.9841,0.5710,0,58.0685,5 DQN with LSTM (real),408,clear
+1.8383,0.9844,0.6366,0,59.7249,5 DQN with LSTM (real),409,mixed
+-8.6286,0.9870,0.7303,0,59.6444,5 DQN with LSTM (real),410,cloudy
+3.6415,0.9838,0.6803,0,63.3708,5 DQN with LSTM (real),411,cloudy
+2.7800,0.9807,0.4069,0,60.9240,5 DQN with LSTM (real),412,clear
+3.3870,0.9853,0.7017,0,59.7249,5 DQN with LSTM (real),413,clear
+-9.0171,0.9835,0.6588,0,58.1091,5 DQN with LSTM (real),414,clear
+3.6424,0.9853,0.7244,0,63.0482,5 DQN with LSTM (real),415,rain
+3.1407,0.9718,0.0664,0,59.7249,5 DQN with LSTM (real),416,clear
+2.7741,0.9785,0.2435,0,63.3708,5 DQN with LSTM (real),417,clear
+3.3179,0.9735,0.0368,0,59.7249,5 DQN with LSTM (real),418,mixed
+-6.6975,0.9703,0.0510,0,59.5478,5 DQN with LSTM (real),419,cloudy
+-4.7274,0.9636,0.0446,0,56.8489,5 DQN with LSTM (real),420,mixed
+2.7557,0.9855,0.7321,0,63.3708,5 DQN with LSTM (real),421,mixed
+3.1828,0.9843,0.6834,0,63.3708,5 DQN with LSTM (real),422,mixed
+2.7644,0.9805,0.2238,0,63.3708,5 DQN with LSTM (real),423,rain
+0.2325,0.9881,0.7512,0,62.0675,5 DQN with LSTM (real),424,cloudy
+-9.2777,0.9819,0.1971,0,59.6749,5 DQN with LSTM (real),425,cloudy
+1.1591,0.9825,0.6663,0,59.7249,5 DQN with LSTM (real),426,rain
+-12.5518,0.9841,0.7388,0,54.9318,5 DQN with LSTM (real),427,cloudy
+3.7034,0.9844,0.7349,0,63.0850,5 DQN with LSTM (real),428,rain
+4.2691,0.9864,0.7136,0,59.6527,5 DQN with LSTM (real),429,mixed
+4.3359,0.9880,0.7562,0,63.3343,5 DQN with LSTM (real),430,cloudy
+-6.5372,0.9672,0.0723,0,58.6444,5 DQN with LSTM (real),431,cloudy
+-8.8867,0.9618,0.0233,0,54.9624,5 DQN with LSTM (real),432,mixed
+-4.6527,0.9825,0.4100,0,56.0381,5 DQN with LSTM (real),433,cloudy
+-7.9390,0.9887,0.7836,0,58.9888,5 DQN with LSTM (real),434,rain
+-3.4421,0.9828,0.6799,0,58.2656,5 DQN with LSTM (real),435,rain
+-0.3038,0.9869,0.7366,0,61.9168,5 DQN with LSTM (real),436,rain
+-7.2709,0.9834,0.6229,0,54.8290,5 DQN with LSTM (real),437,mixed
+-10.1011,0.9765,0.6218,0,54.8290,5 DQN with LSTM (real),438,rain
+-14.4560,0.9853,0.6551,0,54.8290,5 DQN with LSTM (real),439,mixed
+3.3555,0.9852,0.6424,0,63.3708,5 DQN with LSTM (real),440,clear
+-10.1746,0.9833,0.6615,0,55.5624,5 DQN with LSTM (real),441,clear
+-5.7500,0.9791,0.6522,0,59.5610,5 DQN with LSTM (real),442,cloudy
+0.2444,0.9859,0.7114,0,56.1159,5 DQN with LSTM (real),443,clear
+-9.8280,0.9850,0.6947,0,57.2817,5 DQN with LSTM (real),444,clear
+-10.0622,0.9795,0.6619,0,58.2263,5 DQN with LSTM (real),445,clear
+-4.0091,0.9843,0.6473,0,58.9360,5 DQN with LSTM (real),446,clear
+-3.9585,0.9873,0.7475,0,58.7527,5 DQN with LSTM (real),447,clear
+-16.6440,0.9825,0.6399,0,55.2624,5 DQN with LSTM (real),448,clear
+0.2973,0.9824,0.6765,0,59.3555,5 DQN with LSTM (real),449,clear

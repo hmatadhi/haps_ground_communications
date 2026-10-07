@@ -711,6 +711,10 @@ def haps_interference_at_uav_dbm(r_horiz_m, h_uav_m=UAV_ALT_M, h_haps_m=HAPS_ALT
     seen through the sidelobe (F.699 envelope, -10 dBi floor). The power is averaged over the
     UAV's azimuth around the serving HAPS, in linear units.
     """
+    if np.ndim(r_horiz_m) > 0:  # one value per user (vectorised callers)
+        return np.array([haps_interference_at_uav_dbm(float(x), h_uav_m, h_haps_m, spacing_km,
+                                                      g_rx_dbi, p_time_percent, n_azimuth)
+                         for x in np.asarray(r_horiz_m, dtype=float).ravel()]).reshape(np.shape(r_horiz_m))
     phi = np.linspace(0.0, 2.0 * np.pi, n_azimuth, endpoint=False)
     r = float(r_horiz_m)
     dh = h_haps_m - h_uav_m

@@ -1,7 +1,7 @@
 """
-Train the association DQN on 300 real-data episodes and compare with baselines.
+Train the association DQN on 400 real-data episodes and compare with baselines.
 
-Training: 300 rolling 24-hour episodes from 2024 (out-of-sample LSTM forecasts from the
+Training: 400 rolling 24-hour episodes from 2024 (out-of-sample LSTM forecasts from the
 2023-only forward model). Each episode is used once, in order.
 Evaluation: 50 calendar days from 2025 (LSTM test forecasts), greedy policy, no training.
 Baselines on the same 50 days: random action, and max-SINR (best direct HAPS).
@@ -50,7 +50,8 @@ def run_episode(env, policy, agent=None):
         rewards.append(r.mean())
     return {
         "reward_per_step": float(np.mean(rewards)),
-        "jain": float(info["jain_index"]),
+        "jain": float(info["jain_throughput"]),   # reported: Jain over per-user throughput
+        "jain_sinr": float(info["jain_index"]),   # reward term: Jain over linear SINR
         "outage": int(info["n_outage"]),
         "soc": float(np.mean(info["battery_soc"])),
     }
@@ -69,6 +70,14 @@ def random_policy(env, s):
 def max_sinr_policy(env, s):
     # Best direct HAPS by SINR (actions 0..n_haps-1); the paper's closed-form baseline.
     return np.argmax(env._sinr_db, axis=1)
+
+
+def greedy_throughput_policy(env, s):
+    # Same action set as the DQN (direct and UAV relay for each HAPS). Each user takes the action
+    # with the highest throughput, with no learning and no battery or fairness term.
+    direct = np.log2(1.0 + 10.0 ** (env._sinr_db / 10.0))
+    tp = np.concatenate([direct, env._uav_relay_capacity], axis=1)
+    return np.argmax(tp, axis=1)
 
 
 def evaluate_method(eval_eps, policy_name, make_policy, agent=None):

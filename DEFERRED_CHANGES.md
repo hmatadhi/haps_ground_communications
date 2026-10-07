@@ -95,6 +95,19 @@ Paper text is done: Eq. (2) coefficients, intro rain figure, Eq. (3) text.
   - **Caveat:** the `itur` P.618 path call should be checked against the rain-height input before the numbers go into the paper (same check as Q1). The 0.1 % values use the 0.01 % rate as R001, so re-check that input as well.
   - Paper text change (batched): state the 0.1 % target in Section III.B and the intro, and replace the "manageable" feasibility wording with the 1.5 dB result. Compute R0.01 with `itur.models.itu837.rainfall_rate` at 28.61° N, 77.21° E in WSL `~/quantum_env`, then P.618 rain attenuation at 0.01 % for 38 GHz at 11.3° (worst-case path) and at the gateway's near-zenith geometry. Record the results here before editing the feasibility text.
 
+## Section 2 status (latest)
+
+- [x] DQN state is 24-dim: 18 base features (SINR, distance, SoC, rain/vis/hour, gateway and UAV relay capacities) plus six forecasts for hours t..t+5 issued at t−1. Equation and feature list updated.
+- [x] Action space is nine actions (direct, gateway relay, UAV relay for each HAPS). MDP, action-space and limitation text corrected.
+- [x] Reported Jain is over per-user delivered throughput; the reward keeps Jain over linear SINR (stated separately).
+- [x] Greedy-throughput baseline added (same nine actions, no learning). Max-SINR is labelled direct-only. PreLSTM rows removed from the table and explained in one sentence.
+- [x] Final 5-seed results in the policy, seed and paired tables, and in the fairness, reward, baseline and conclusion paragraphs.
+- [x] Episode count is 400 in code and paper. The 300 was only in the single-model script, changed to 400. Confirm with the author.
+- [ ] Diebold–Mariano test for LSTM vs persistence, and naming the 50 evaluation days (deferred to the end, per the author).
+- [ ] DQN without the LSTM feature (the with/without-forecast ablation) and oracle rain. Needed to show the LSTM's contribution.
+- [ ] Reward worked example (2.4), hyperparameter table (2.10).
+- [ ] Forecasting baseline (climatology or gradient-boosted model) and single-site limitation for Delhi (kept open, per the author).
+
 ## Section 1 status (final pass)
 
 - [x] **D1.1a–c** rain model: `battery_model.py` and `train_lstm.py` use the P.618 slant-path model at 89.86° (γ_R·L_s·r, P.839 rain height 5.28 km). LSTM retrained and DQN retrained (5 seeds, 400 episodes). Results in the paper updated.
@@ -130,6 +143,8 @@ Paper text is done: Eq. (2) coefficients, intro rain figure, Eq. (3) text.
 - **Still open in Section 1 (not done by this step):** D1.1d (atmospheric-loss plot), D1.1e (check scripts), D1.2 (gateway interference text, Summary and Conclusion), D1.3 (scintillation model), D1.4 (working-set table in the paper), D1.5 (capacities with interference, relay table, Figure 12), D1.6 (linear averaging; Holis & Pechac Eq. 4 η replacement; product-series citation), D1.8 ("margin" wording). Citation wording (W4, M.2101, TS 38.821, n256) reserved for later per the author.
 
 ## Future work (agreed, not in this revision)
+
+- [ ] **FW1b Spatio-temporal graph forecaster (extension of FW1).** A GNN-LSTM (DCRNN, T-GCN or Graph WaveNet style): each region is a node, edges link neighbouring regions, an LSTM runs over time at each node, and edge weights are learned to estimate how much each neighbour contributes to the target. Requirements before any work: (a) time series for every node (ERA5 or station data from the sea, desert, plains and Himalayan regions), with licensing confirmed; (b) a held-out check that the learned edges are physically plausible (distance, wind direction), since learned graphs can be spurious; (c) benchmarks against the current LSTM, persistence and climatology on the same 2026 hours; (d) a separate DQN retrain if the forecast changes. Not in this revision.
 
 - [ ] **FW1 Neighbouring-region inputs for the LSTM.** Add current observations from neighbouring regions, refreshed periodically, and learn the relationship between them and the site's rain attenuation (spatial lag features). Accepted that the LSTM's gain over persistence is modest for now. Write this as future work in the Conclusion, and do not claim it as a result.
 
