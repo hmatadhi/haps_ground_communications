@@ -47,7 +47,7 @@
 \large Channel-Model Implementation and Signal-Quality Characterisation}
 
 \author{\IEEEauthorblockN{Harsha Matadhikari}
-\IEEEauthorblockA{IIT Delhi Online PG Diploma Advanced Comm Engg with Quantum AI Integration}}
+\IEEEauthorblockA{Indian Institute of Technology Delhi, Online PG Diploma in Advanced Communication Engineering with Quantum AI Integration}}
 
 \maketitle
 
@@ -67,7 +67,7 @@ ITU-R atmospheric losses (rain, fog, gas, scintillation) for backhaul-
 and feeder-link design. The channel model is realised in Python (NumPy +
 Matplotlib + itur package) and characterised through signal-
 quality curves, spatial-heterogeneity analysis, and atmospheric
-sensitivity results. An LSTM forecasts 38\,GHz feeder rain attenuation up to six hours ahead; on held-out 2026 data it is more accurate than persistence only at four to six hours (RMSE), and the DQN uses all six forecast horizons. A DQN agent using this forecast earns higher reward than a max-throughput rule over the same six actions, and than max-SINR, across five experiments, with zero outage and fairness equal to the max-throughput rule.
+sensitivity results. An LSTM forecasts 38\,GHz feeder rain attenuation up to six hours ahead; on held-out 2026 data it is more accurate than persistence only at four to six hours (RMSE), and the DQN uses all six forecast horizons. A DQN agent using this forecast earns higher reward than a max-throughput rule over the same six actions, and than max-SINR, across five experiments, with zero outage and fairness not significantly different from the max-throughput rule.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -105,13 +105,13 @@ A typical HAPS system consists of a stratospheric, solar-powered platform operat
 \end{itemize}
 \subsubsection{Elevation Angle and Slant Path}
 \begin{itemize}
-\item[] Because the HAPS provides coverage up to a radius of 100 km~\cite{itu_m2106}, many links operate at low elevation angles. These "slant paths" (§2.1, worst-case 102 km) result in a significantly longer signal trajectory through the moisture-dense troposphere compared to vertical (nadir) paths, leading to higher cumulative attenuation per ITU-R P.618~\cite{itu_p618}.
+\item[] Because the HAPS provides coverage up to a radius of 100 km~\cite{itu_m2106}, many links operate at low elevation angles. These "slant paths" (worst case 102 km) result in a significantly longer signal trajectory through the moisture-dense troposphere compared to vertical (nadir) paths, leading to higher cumulative attenuation per ITU-R P.618~\cite{itu_p618}.
 \end{itemize}
 
 \subsection{Problem Statement}
 The above considerations define the control-layer problem for relay links: determining the position of each UAV relay and assigning service or relay channels so that users are served fairly and reliably. The system must also select the best serving HAPS for either the HAPS-to-UAV or HAPS-to-UE path to maximize throughput and minimize outage. The control layer must adapt to changing user positions, weather conditions, and HAPS battery states. 
 
-In this document, we (i) characterise the channel: free-space and LoS-probability path loss, SINR under the 3-HAPS geometry, and ITU-R atmospheric losses at 38\,GHz; (ii) compare two association rules, random and max-SINR, which select the platform for each user; (iii) build an LSTM that forecasts the 38\,GHz feeder rain attenuation over the next six hours from past weather; and (iv) train a DQN agent that uses this forecast in its state, comparing it with max-SINR and random on 50 held-out days from 2025 over five experiments. UAV placement is analysed through relay geometry and the landscape LoS mechanism; it is not optimised.
+In this document, we (i) characterise the channel: free-space and LoS-probability path loss, SINR under the 3-HAPS geometry, and ITU-R atmospheric losses at 38\,GHz; (ii) compare two association rules, random and max-SINR, which select the platform for each user; (iii) build an LSTM that forecasts the 38\,GHz feeder rain attenuation over the next six hours from past weather; and (iv) train a DQN agent that uses this forecast in its state, comparing it with max-SINR and random on 50 held-out days from 2025 over five experiments. UAV placement is analysed through relay geometry and the landscape LoS mechanism; it is not optimised. The contributions are: (1) a reproducible channel model for the HAPS, UAV and gateway links, with ITU-R propagation, scintillation and rain at the study site; (2) a quantitative check of the multi-HAPS interference, showing where it limits the 2\,GHz service link and why the 38\,GHz gateway link is not limited by it; (3) a rain-feasibility result for the 38\,GHz gateway link at 99.9\,\% availability; and (4) a DQN association agent trained on real 2024 weather and tested on held-out 2025 and 2026 days, compared with rule-based policies on the same action set.
 
 % =====================================================================
 \section{PoC - Topology and Link Types}
@@ -812,7 +812,7 @@ SINR on each hop against the direct HAPS\,$\rightarrow$\,UE link.
 \label{fig:uav-relay-comparison}
 \end{figure}
 
-\noindent\textbf{Key finding: the relay outperforms the direct link at every distance,
+\noindent\textbf{The relay outperforms the direct link at every distance,
 because co-channel interference from the other HAPS limits the direct service link.}
 The UAV hovers directly above the user it serves (\S II), so its horizontal distance
 from the user is small and fixed, while its distance from the serving HAPS grows with
@@ -965,7 +965,7 @@ Figure~\ref{fig:sinr-service-link} decomposes this along one representative dire
 
 \begin{figure}[h!]\centering
 \includegraphics[width=0.95\columnwidth]{./figures/haps_sinr_trellis.png}
-\caption{2~GHz service link SINR, four identical landscape subplots (landscape-independent, \S III.C), 10--100\,km distances.}
+\caption{2~GHz service link SINR, four identical landscape subplots (identical across landscapes, \S III.C), 10--100\,km distances.}
 \label{fig:sinr-service-link}
 \end{figure}
 
@@ -973,7 +973,7 @@ Figure~\ref{fig:sinr-feeder-link} shows the 38~GHz backhaul-link SINR for gatewa
 
 \begin{figure}[h!]\centering
 \includegraphics[width=0.95\columnwidth]{./figures/haps_feeder_link_38ghz.png}
-\caption{38~GHz backhaul link (HAPS-to-Gateway) SINR, four identical landscape subplots (landscape-independent, \S III.C), 10--500\,m distances.}
+\caption{38~GHz backhaul link (HAPS-to-Gateway) SINR, four identical landscape subplots (identical across landscapes, \S III.C), 10--500\,m distances.}
 \label{fig:sinr-feeder-link}
 \end{figure}
 
@@ -1012,7 +1012,7 @@ Three rule-based (non-learned) association policies are evaluated:
 \end{itemize}
 All three are evaluated over 50 held-out episodes (random seed 999) using Jain's fairness index,
 outage fraction (SINR below $-2$~dB, the severe-outage threshold measured in
-Section~IV.B/Table A.3), and aggregate throughput (Shannon capacity, summed over
+Table A.3), and aggregate throughput (Shannon capacity, summed over
 users) as metrics. Jain's fairness index measures how evenly a resource (here,
 per-user throughput $T_k$) is shared across the $N$ users,
 \begin{equation}
@@ -1045,13 +1045,13 @@ Using the setup of Section~\ref{sec:assoc-baseline-setup}, this measures the thr
 {\scriptsize\setlength{\tabcolsep}{3pt}
 \begin{tabularx}{\columnwidth}{|>{\raggedright\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
 \hline
-\textbf{Policy} & \textbf{Reward per step} & \textbf{Jain} & \textbf{Outage /50} \
+\textbf{Policy} & \textbf{Reward per step} & \textbf{Jain} & \textbf{Outage /50} \\
 \hline
-Random (all six actions) & $-46.9\pm17.1$ & $0.266\pm0.042$ & $16.4\pm3.5$ \
+Random (all six actions) & $-46.9\pm17.1$ & $0.266\pm0.042$ & $16.4\pm3.5$ \\
 \hline
-Max-SINR (direct only) & $-19.3\pm17.5$ & $\mathbf{0.700\pm0.027}$ & $1.0\pm0.9$ \
+Max-SINR (direct only) & $-19.3\pm17.5$ & $\mathbf{0.700\pm0.027}$ & $1.0\pm0.9$ \\
 \hline
-Max-throughput (all six) & $\mathbf{-11.0}\pm17.7$ & $0.764\pm0.035$ & $\mathbf{0.0}\pm0.0$ \
+Max-throughput (all six) & $\mathbf{-11.0}\pm17.7$ & $0.764\pm0.035$ & $\mathbf{0.0}\pm0.0$ \\
 \hline
 \end{tabularx}}
 \end{table}
@@ -1166,7 +1166,7 @@ where $C^{\text{UAV}}_{k,p}$ is the UAV-relay capacity of platform $p$ for user 
 (cross-referenced to Phase~1 results):
 
 \begin{itemize}\setlength{\itemsep}{0pt}
-  \item $\text{SINR}_{k,p}$: Downlink SINR at user $k$ from platform $p$ (dB). Phase~1 measured $[-7.4, +7.3]$~dB across 100~km footprint (Fig.~\ref{fig:multinode-interference}); bounds $[-20, +30]$~dB provide headroom for edge cases.
+  \item $\text{SINR}_{k,p}$: Downlink SINR at user $k$ from platform $p$ (dB). Phase~1 measured $[-11.3, +7.3]$~dB across the 100~km footprint (Fig.~\ref{fig:multinode-interference}); bounds $[-20, +30]$~dB provide headroom for edge cases.
   \item $r_{k,p}$: Horizontal distance user~$k$ to platform~$p$ (km). Range $[0, 100]$~km covers service footprint (§~II).
   \item $\text{SoC}_p$: Battery state-of-charge platform~$p$ (\%). Observed by all users; range $[0, 100]\,\%$ (empty to full).
   \item $R_{\text{rain}}$: Rainfall rate (mm/h). Range $[0, 50]$~mm/h (rare events).
@@ -1190,7 +1190,7 @@ where $C^{\text{UAV}}_{k,p}$ is the UAV-relay capacity of platform $p$ for user 
   \item \textbf{LSTM forecaster}: predicts rain attenuation up to six hours ahead from past weather, all six horizons are used by the agent (Section~\ref{sec:lstm}); forecasting scintillation fading, which would enable adaptive fade reallocation, is future work
 \end{itemize}
 
-\textbf{Validation:} Phase~1 measured SINR $\in [-11.27, +7.25]$~dB across the full 10--100~km, 24-point angular sweep (worst case at $r=75$\,km, $\theta=0^\circ$; best case at $r=10$\,km, $\theta=210^\circ$; Figure~\ref{fig:multinode-interference} and underlying spatial sweep data). Bounds $[-20, +30]$~dB lie $8.7$\,dB below and $22.8$\,dB above the observed range, for edge cases (atmospheric fading, relay paths in v2).
+\textbf{Validation:} Phase~1 measured SINR $\in [-11.3, +7.3]$~dB across the full 10--100~km, 24-point angular sweep (worst case at $r=75$\,km, $\theta=0^\circ$; best case at $r=10$\,km, $\theta=210^\circ$; Figure~\ref{fig:multinode-interference} and underlying spatial sweep data). Bounds $[-20, +30]$~dB lie $8.7$\,dB below and $22.8$\,dB above the observed range, for edge cases (atmospheric fading, relay paths in v2).
 
 \subsubsection{Action Space}
 
@@ -1235,7 +1235,7 @@ User & SINR (dB) & $\gamma_k$ & $T_k c_\mathrm{rain}$ & Penalty & $r_k$ \\
 \noindent \textbf{Threshold rationale:} Phase~1 measured best $+7.3$~dB, average $+2.0$~dB and worst $-4.3$~dB. The penalties apply only below $0$~dB, so normal operation ($+2$ to $+7$~dB) earns no penalty.
 
 
-\subsection{Critical Implementation Fixes}
+\subsection{Implementation Fixes}
 
 DQN training must avoid six silent errors:
 
@@ -1275,7 +1275,7 @@ term. This does not change the total reward mass, only its attribution for learn
 it were already a percentage: $\text{SoC} \mathrel{+}= (\Delta E_{\text{Wh}} / C_{\text{battery}})$
 instead of $\text{SoC} \mathrel{+}= 100 \times (\Delta E_{\text{Wh}} / C_{\text{battery}})$.
 This under-scales every SoC update by $100\times$, so battery state barely moves
-regardless of policy (observed: SoC pinned at $\approx$65\% across all three
+regardless of policy (observed: SoC pinned at $\approx$60\% across all three
 DQN and rule-based or random policies before the fix) -- silently disabling the
 entire energy/battery term of the reward. \textbf{Fix:} apply the missing $\times100$
 conversion, and use $C_{\text{battery}}=12{,}000$~Wh matching Table~\ref{tab:config}'s
@@ -1296,7 +1296,7 @@ where: $P_{\text{backhaul}} = 500$~W (backhaul-link transmitter, HAPS-to-Gateway
 
 \subsubsection{Solar Power (Diurnal Cycle)}
 
-\textbf{Critical principle:} HAPS at 20~km (stratosphere, above $>99\%$ clouds). Solar independent of ground weather.
+\textbf{Principle:} HAPS at 20~km (stratosphere, above $>99\%$ clouds). Solar independent of ground weather.
 
 \noindent Solar irradiance (cosine profile):
 \begin{equation}
@@ -1401,13 +1401,13 @@ Experiments / evaluation & 5 experiments (0--4); 50 held-out 2025 days per exper
 \hline
 \textbf{Policy} & \textbf{Reward per step} & \textbf{Jain} & \textbf{Outage /50} \\
 \hline
-Random (all six actions) & $-29.5\,(1.8)$ & $0.581\,(0.006)$ & $10.9\,(0.4)$ \\
+Random (all six actions) & $-40.5\,(1.7)$ & $0.563\,(0.007)$ & $16.5\,(0.4)$ \\
 \hline
 Max-SINR (direct only) & $-14.5\,(2.1)$ & $0.866\,(0.002)$ & $0.9\,(0.2)$ \\
 \hline
-Max-throughput (six actions, no learning) & $-3.8\,(1.7)$ & $\mathbf{0.982}\,(0.000)$ & $\mathbf{0.0}\,(0.0)$ \\
+Max-throughput (all six actions, no learning) & $-3.8\,(1.7)$ & $\mathbf{0.988}\,(0.000)$ & $\mathbf{0.0}\,(0.0)$ \\
 \hline
-\textbf{LSTM + DQN} & $\mathbf{+1.4}\,(0.7)$ & $\mathbf{0.982}\,(0.002)$ & $\mathbf{0.0}\,(0.0)$ \\
+\textbf{LSTM + DQN} & $\mathbf{+1.4}\,(1.0)$ & $0.981\,(0.006)$ & $\mathbf{0.0}\,(0.0)$ \\
 \hline
 \end{tabularx}}
 \end{table}
@@ -1415,46 +1415,45 @@ Max-throughput (six actions, no learning) & $-3.8\,(1.7)$ & $\mathbf{0.982}\,(0.
 \begin{table}[t]
 \centering
 \caption{LSTM + DQN across five experiments: mean, standard deviation, median, range, and 95\% confidence interval of the mean.}
-\label{tab:dqn-experiment-stats}
+\label{tab:dqn-seed-stats}
 {\scriptsize\setlength{\tabcolsep}{2.5pt}
 \begin{tabularx}{\columnwidth}{|>{\raggedright\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
 \hline
 \textbf{Metric} & \textbf{Mean $\pm$ std} & \textbf{Median} & \textbf{Range} & \textbf{95\% CI} \\
 \hline
-Reward per step & $+1.44\pm0.70$ & $+1.63$ & $[0.57,\,2.15]$ & $[0.57,\,2.31]$ \\
+Reward per step & $+1.40\pm0.96$ & $+1.92$ & $[0.02,\,2.21]$ & $[0.21,\,2.59]$ \\
 \hline
-Jain fairness (throughput) & $0.982\pm0.002$ & $0.983$ & $[0.978,\,0.984]$ & $[0.980,\,0.985]$ \\
+Jain fairness (throughput) & $0.981\pm0.006$ & $0.984$ & $[0.970,\,0.984]$ & $[0.973,\,0.988]$ \\
 \hline
 Outage /50 & $0.0\pm0.0$ & $0.0$ & $[0,\,0]$ & $[0,\,0]$ \\
 \hline
-Battery SoC (\%) & $59.91\pm0.54$ & $59.95$ & $[59.08,\,60.45]$ & $[59.24,\,60.58]$ \\
+Battery SoC (\%) & $59.96\pm0.59$ & $59.95$ & $[59.07,\,60.53]$ & $[59.22,\,60.69]$ \\
 \hline
 \end{tabularx}}
 \end{table}
 
 \begin{table}[t]
 \centering
-\caption{Paired differences, LSTM + DQN minus each rule-based or random policy, per experiment (50 days each).}
+\caption{Paired differences, LSTM + DQN minus each rule-based or random policy, per experiment (50 days each). Outage is better when lower.}
 \label{tab:dqn-paired}
 {\scriptsize\setlength{\tabcolsep}{2.5pt}
-\resizebox{\columnwidth}{!}{%
 \begin{tabular}{|>{\raggedright\arraybackslash}p{2.3cm}|>{\centering\arraybackslash}p{1.4cm}|>{\centering\arraybackslash}p{2.6cm}|>{\centering\arraybackslash}p{1.2cm}|>{\centering\arraybackslash}p{1.1cm}|}
 \hline
 \textbf{Metric / comparison} & \textbf{Mean difference} & \textbf{95\% CI} & \textbf{$p$-value} & \textbf{Experiments} \\
 \hline
-Reward vs max-SINR & $+15.90$ & $[+13.6,\,+18.2]$ & $<0.001$ & $5/5$ \\
+Reward vs max-SINR & $+15.87$ & $[+13.6,\,+18.2]$ & $<0.001$ & $5/5$ \\
 \hline
-Reward vs max-throughput & $+5.26$ & $[+3.5,\,+7.0]$ & $0.001$ & $5/5$ \\
+Reward vs max-throughput & $+5.17$ & $[+3.4,\,+6.9]$ & $0.001$ & $5/5$ \\
 \hline
-Jain vs max-SINR & $+0.117$ & $[+0.113,\,+0.120]$ & $<0.0001$ & $5/5$ \\
+Jain vs max-SINR & $+0.115$ & $[+0.106,\,+0.124]$ & $<0.0001$ & $5/5$ \\
 \hline
-Jain vs max-throughput & $+0.0004$ & $[-0.002,\,+0.003]$ & $0.70$ & $4/5$ \\
+Jain vs max-throughput & $-0.007$ & $[-0.015,\,+0.001]$ & $0.07$ & $0/5$ \\
 \hline
-Outage vs max-SINR & $-0.87$ & $[-1.1,\,-0.6]$ & $0.0007$ & $5/5$ \\
+Outage vs max-SINR & $-0.87$ & $[-1.13,\,-0.61]$ & $0.0007$ & $5/5$ \\
 \hline
-Battery SoC vs max-SINR (\%) & $-0.02$ & $[-0.1,\,+0.1]$ & $0.44$ & $3/5$ \\
+Battery SoC vs max-SINR (\%) & $+0.03$ & $[-0.06,\,+0.11]$ & $0.44$ & $4/5$ \\
 \hline
-\end{tabular}}}
+\end{tabular}}
 \end{table}
 
 \begin{figure*}[t]
@@ -1464,11 +1463,11 @@ Battery SoC vs max-SINR (\%) & $-0.02$ & $[-0.1,\,+0.1]$ & $0.44$ & $3/5$ \\
 \label{fig:policy-comparison}
 \end{figure*}
 
-\paragraph{Reward and outage.} LSTM + DQN has the highest mean reward ($+1.4$ per step) and no outage. Against the max-throughput rule, which uses the same six actions without learning, the DQN gains $5.3$ reward per step, on every experiment. Against max-SINR, which can use only the direct links, the gain is $15.9$ per step. Outage is zero for both the DQN and the max-throughput rule, and $0.9$ users on average for max-SINR (Table~\ref{tab:dqn-paired}).
+\paragraph{Reward and outage.} LSTM + DQN has the highest mean reward ($+1.4$ per step) and no outage. Against the max-throughput rule, which uses the same six actions without learning, the DQN gains $5.2$ reward per step, on every experiment. Against max-SINR, which can use only the direct links, the gain is $15.9$ per step. Outage is zero for both the DQN and the max-throughput rule, and $0.9$ users on average for max-SINR (Table~\ref{tab:dqn-paired}).
 
-\paragraph{Fairness.} The reported Jain index is over per-user delivered throughput. The DQN and the max-throughput rule are equally fair ($0.98$), and both are fairer than max-SINR ($0.87$) and random ($0.58$). The reward's own fairness term is Jain over linear SINR. It enters the reward but is not the reported measure.
+\paragraph{Fairness.} The reported Jain index is over per-user delivered throughput. The DQN ($0.98$) and the max-throughput rule ($0.99$) are close, and the difference between them is not significant. Both are fairer than max-SINR ($0.87$) and random ($0.56$). The reward's own fairness term is Jain over linear SINR. It enters the reward but is not the reported measure.
 
-\paragraph{Random and rule-based policies and weather.} Random association is worst on every metric. The random and max-SINR policies do not read the forecast or the rain, so their results depend only on the evaluation days. Their results on the synthetic PreLSTM days (50 days with hourly rain drawn from the ITU-R P.837 statistics for Delhi) agree with the real-weather results to within $0.1$ in reward. The synthetic days therefore reproduce the baseline behaviour, and they are used only as this check.
+\paragraph{Random and rule-based policies and weather.} Random association is worst on every metric. The random and max-SINR policies do not read the forecast or the rain, so their results depend only on the evaluation days. Their results on the synthetic PreLSTM days (50 days with hourly rain drawn from the ITU-R P.837 statistics for Delhi) agree with the real-weather results to within $0.2$ in reward. The synthetic days therefore reproduce the baseline behaviour, and they are used only as this check.
 
 \paragraph{Limitation.} The DQN and the max-throughput rule share the same action set, so the gap between them isolates what the learned policy adds. The topology has a single ground gateway serving the network, and sharing of that gateway is not modelled. All weather data are for one site (Delhi, 28.61\,N, 77.21\,E), so the rain statistics and the forecast skill may not transfer to other climates.
 
@@ -1507,7 +1506,7 @@ against the direct link's $2.7$ and $0.5$\,bits/s/Hz (Table~\ref{table:app-uav-r
 the direct link at every distance in this model.
 DQN association agent (\S\ref{sec:phase2-motivation}) can route traffic through the UAV relay, as one of its six actions.
 
-\paragraph{Learned association.} The LSTM-fed DQN agent (\S\ref{sec:dqn-results}) has the highest reward of the policies tested on the held-out 2025 days ($+1.4$ per step, against $-3.8$ for a max-throughput rule over the same six actions and $-14.5$ for max-SINR), with zero outage and the same per-user throughput fairness as the max-throughput rule (Jain $0.98$). The advantage over the max-throughput rule holds on all five training experiments. Max-SINR assumes the SINR to every platform is known at decision time, which a deployed system must measure, and it cannot use the relays. Two
+\paragraph{Learned association.} The LSTM-fed DQN agent (\S\ref{sec:dqn-results}) has the highest reward of the policies tested on the held-out 2025 days ($+1.4$ per step, against $-3.8$ for a max-throughput rule over the same six actions and $-14.5$ for max-SINR), with zero outage and per-user throughput fairness close to the max-throughput rule (Jain $0.98$ against $0.99$; the difference is not significant). The reward advantage over the max-throughput rule holds on all five experiments. Max-SINR assumes the SINR to every platform is known at decision time, which a deployed system must measure, and it cannot use the relays. Two
 directions for future work follow: (1) adding a fairness-aware reward to test whether the learned policy trades fairness for throughput, and testing on harder (e.g.\ rain- or
 mobility-heavy) scenarios, and (2) learning how the relay options are used across user distances, since the relay outperforms the direct link at every
 distance in this model, so the learned
