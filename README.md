@@ -28,12 +28,27 @@ pdflatex -interaction=nonstopmode HAPS_AI_HW_ChannelModel.tex
 
 ## Generate figures and tables
 
-CMake is intended for Python-generated artifacts, not the LaTeX paper compile itself.
+Generation scripts are located in `src/`:
+
+### Direct execution (recommended)
+
+```bash
+cd src
+bash generate_all_wsl.sh    # WSL
+# or
+python generate_all.py       # Cross-platform
+# or
+bash generate_all.sh         # Bash/Git Bash
+```
+
+### Using CMake
 
 ```powershell
-cmake -S . -B build
+cmake -S . -B build -G "Unix Makefiles"
 cmake --build build --target generate
 ```
+
+See **[QUICKSTART.md](QUICKSTART.md)** for detailed usage instructions.
 
 ## Clean generated files
 
