@@ -1,5 +1,0 @@
-metric,mean_diff_dqn_minus_maxsinr,ci95_low,ci95_high,p_value_t_test,dqn_better_seeds
-reward_per_step,15.8664,13.5771,18.1557,0.0000,5
-jain,0.1151,0.1058,0.1244,0.0000,5
-outage,-0.8720,-1.1316,-0.6124,0.0007,5
-soc,0.0248,-0.0561,0.1057,0.4424,4

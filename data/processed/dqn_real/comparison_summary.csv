@@ -1,6 +1,0 @@
-policy,reward_per_step_mean,reward_per_step_std,jain_mean,jain_std,outage_mean,outage_std,soc_mean,soc_std
-1 Phase1 random (real),-30.9645,8.1973,0.5851,0.0529,9.9800,3.0135,59.4436,2.7446
-2 Phase1 max-SINR (real),-16.4789,7.9965,0.8623,0.0154,1.0200,1.0971,59.4609,2.8441
-3 PreLSTM random,-30.7180,8.2530,0.5728,0.0540,11.2800,3.0307,59.4386,2.7502
-4 PreLSTM max-SINR,-16.4588,8.0032,0.8623,0.0154,1.0200,1.0971,59.4609,2.8441
-5 DQN with LSTM (real),-2.7055,5.9414,0.9823,0.0061,0.0000,0.0000,59.4771,2.8522

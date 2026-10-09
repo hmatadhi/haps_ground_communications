@@ -1,4 +1,0 @@
-policy,reward_mean,reward_std,jain_mean,jain_std,outage_mean,outage_std
-Random,-46.9314,17.0593,0.2661,0.0421,16.3800,3.4692
-Max-SINR (direct only),-19.2972,17.4672,0.6998,0.0273,0.9600,0.8709
-Max-throughput (all six),-11.0108,17.6947,0.7636,0.0350,0.0000,0.0000
