@@ -125,8 +125,10 @@ class HAPSAssociationEnv:
         self.rng = np.random.default_rng(seed)
 
         self.n_haps = 3
-        self.n_actions = 3 * self.n_haps  # direct {0,1,2} + relay-via-Gateway {3,4,5} + relay-via-UAV {6,7,8}
-        self.state_dim = 3 + 3 + 3 + 3 + 3 + 3  # SINR + dist + SoC + (rain, vis, hour) + gw relay capacity + uav relay capacity
+        # Gateway relay is not an option in the paper's model; the switch keeps the code path.
+        self.include_gw_relay = False
+        self.n_actions = (3 if self.include_gw_relay else 2) * self.n_haps  # direct, [gateway relay], UAV relay
+        self.state_dim = 3 + 3 + 3 + 3 + 3  # SINR + dist + SoC + (rain, vis, hour) + UAV relay capacity
 
         self.battery_model = HAPSBatteryModel(battery_capacity_wh=12_000.0)  # paper's C_battery (eq. battery-balance)
 
@@ -186,6 +188,7 @@ class HAPSAssociationEnv:
                 gw_ue_dist_m=dist_m[:, p],
             )
             relay_capacity[:, p] = relay["capacity_relay_bps_hz"]
+            self._feeder_capacity_bps_hz = float(relay["capacity_feeder_bps_hz"])
         self._relay_capacity = relay_capacity
 
         uav_relay_capacity = np.zeros((self.n_users, self.n_haps))
@@ -218,8 +221,7 @@ class HAPSAssociationEnv:
         s[:, 9] = np.clip(rain / RAIN_MM_H_MAX, 0.0, 1.0)
         s[:, 10] = np.clip(vis_m / VIS_M_MAX, 0.0, 1.0)
         s[:, 11] = self.hour_of_day / 24.0
-        s[:, 12:15] = np.clip(self._relay_capacity / CAPACITY_BPS_HZ_MAX, 0.0, 1.0)
-        s[:, 15:18] = np.clip(self._uav_relay_capacity / CAPACITY_BPS_HZ_MAX, 0.0, 1.0)
+        s[:, 12:15] = np.clip(self._uav_relay_capacity / CAPACITY_BPS_HZ_MAX, 0.0, 1.0)
         return s
 
     # ------------------------------------------------------------------
@@ -229,8 +231,12 @@ class HAPSAssociationEnv:
         n_haps..2*n_haps-1 = relay via that HAPS's Gateway; actions
         2*n_haps..3*n_haps-1 = relay via a UAV served by that HAPS."""
         actions = np.asarray(actions, dtype=int)
-        is_gw_relay = (actions >= self.n_haps) & (actions < 2 * self.n_haps)
-        is_uav_relay = actions >= 2 * self.n_haps
+        if self.include_gw_relay:
+            is_gw_relay = (actions >= self.n_haps) & (actions < 2 * self.n_haps)
+            is_uav_relay = actions >= 2 * self.n_haps
+        else:
+            is_gw_relay = np.zeros(len(actions), dtype=bool)
+            is_uav_relay = actions >= self.n_haps
         serving_haps = actions % self.n_haps  # direct/gw-relay/uav-relay all load the same HAPS's battery
         user_idx = np.arange(self.n_users)
 
@@ -240,6 +246,12 @@ class HAPSAssociationEnv:
         # computations.
         direct_sinr_db = self._sinr_db[user_idx, serving_haps]
         gw_relay_capacity = self._relay_capacity[user_idx, serving_haps]
+        if getattr(self, "shared_gateway", False):
+            # One physical gateway (paper: 1 ground gateway for all 3 HAPS). Its feeder capacity
+            # is divided equally among all users routed through it, so crowding reduces throughput.
+            n_gw_users = int(np.sum(is_gw_relay))
+            share = self._feeder_capacity_bps_hz / max(n_gw_users, 1)
+            gw_relay_capacity = np.minimum(gw_relay_capacity, share)
         gw_relay_sinr_db = 10.0 * np.log10(np.maximum(2.0 ** gw_relay_capacity - 1.0, 1e-15))
         uav_relay_capacity = self._uav_relay_capacity[user_idx, serving_haps]
         uav_relay_sinr_db = 10.0 * np.log10(np.maximum(2.0 ** uav_relay_capacity - 1.0, 1e-15))
@@ -287,10 +299,20 @@ class HAPSAssociationEnv:
         # Rain degrades the 38 GHz feeder (backhaul) link, not the 2 GHz
         # service-link SINR above -- so it de-rates only the throughput
         # credit, leaving fairness/energy/outage penalties untouched.
-        rain = self.weather_state.rain_mm_h if self.weather_state else 0.0
-        feeder = feeder_link_rain_effect_on_capacity(rain)
-        capacity_fraction = float(np.clip(10.0 ** (-feeder["total_rain_loss_db"] / 10.0), 0.05, 1.0))
+        # rain_att_override_db (set by RealEpisodeEnv) replaces the paper's rain-loss model
+        # with the ITU-R P.618 path attenuation for the hour. None keeps the paper's model.
+        override_db = getattr(self, "rain_att_override_db", None)
+        if override_db is not None:
+            rain_loss_db = float(override_db)
+        else:
+            rain = self.weather_state.rain_mm_h if self.weather_state else 0.0
+            rain_loss_db = feeder_link_rain_effect_on_capacity(rain)["total_rain_loss_db"]
+        capacity_fraction = float(np.clip(10.0 ** (-rain_loss_db / 10.0), 0.05, 1.0))
         effective_throughput = individual_throughput * capacity_fraction
+        # Reported fairness: Jain index over per-user delivered throughput (the reward's
+        # fairness term above stays on linear SINR, as in the paper's reward definition).
+        t_sum, t_sq = float(np.sum(effective_throughput)), float(np.sum(effective_throughput ** 2))
+        jain_throughput = (t_sum ** 2) / (self.n_users * t_sq) if t_sq > 0 else 0.0
 
         shared_term = self.omega_2 * jain - self.omega_3 * energy_penalty + low_battery_penalty
         rewards = (self.omega_1 * effective_throughput
@@ -302,7 +324,8 @@ class HAPSAssociationEnv:
         done = self.t >= self.max_steps
 
         info = {
-            "jain_index": jain,
+            "jain_index": jain,              # reward fairness (linear SINR)
+            "jain_throughput": jain_throughput,  # reported fairness (per-user throughput)
             "throughput_bps_hz": l_agg,
             "n_outage": int(np.sum(severe)),
             "battery_soc": self.soc.copy(),

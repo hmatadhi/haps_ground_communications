@@ -48,8 +48,6 @@ cmake -S . -B build -G "Unix Makefiles"
 cmake --build build --target generate
 ```
 
-See **[QUICKSTART.md](QUICKSTART.md)** for detailed usage instructions.
-
 ## Clean generated files
 
 Remove LaTeX build artifacts manually:

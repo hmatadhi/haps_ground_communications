@@ -9,7 +9,29 @@
 *.toc
 *.synctex.gz
 
+# Beamer build artifacts
+*.nav
+*.snm
+*.vrb
+
 # Python bytecode / notebook checkpoints
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+
+# Generated data and trained models: reproducible from src/, not source.
+# Raw inputs (NASA POWER, METAR, ERA5) are downloaded by src/lstm/download_*.py.
+data/
+models/
+
+# CMake build artifacts
+CMakeCache.txt
+CMakeFiles/
+src/build/
+
+# Stray diffs and backup copies
+*.diff
+*backup*.tex
+
+# Internal docs kept local only; README.md is what's shared.
+docs/

@@ -54,14 +54,10 @@ NOTE ON FIDELITY
   IEEE Trans. Antennas Propag., vol. 56, no. 4, Table I, pp. 1079.
   Four environment profiles: suburban (α=0.1, β=750, ξ=8m), urban (α=0.3, β=500, ξ=15m),
   dense urban (α=0.5, β=300, ξ=20m), high-rise (α=0.5, β=300, ξ=50m).
-* eta_los / eta_nlos (mean excess path loss for the averaged path-loss model,
-  eq. 4) apply to the UAV/relay tier only, not the HAPS tier (see above).
-  They are a separate, unrelated parameter set; marked "VERIFY vs Table 1"
-  (Paper 1's own simulation-parameters table, still not machine-extracted).
-  PHASE 2: Arani et al. Table 1 gives eq.-4-style parameters (delta, eta as
-  path-loss exponent, chi as shadowing sigma) for their one simulated
-  environment (suburban) -- see ENVIRONMENTS comment below for the numbers.
-  Not yet adopted; current eta_los/eta_nlos values remain flat dB offsets.
+* UAV-to-UE shadowing (UAV/relay tier only, not the HAPS tier): LoS zero-mean with
+  sigma 4 dB; NLoS mean and sigma from Holis & Pechac (2008) Eq. (4) and Table IV
+  (holis_nlos_shadowing_db). The average is taken in linear gain. The former flat
+  eta_los / eta_nlos offsets have been removed because they had no source.
 * NOT MODELED: a two-hop User -> UAV -> HAPS relay/amplification SINR chain
   (i.e. UAV as a signal amplifier/repeater within a single SINR equation).
   Paper 1 (Arani et al.) treats UAVs and HAPS as parallel, independent
@@ -149,22 +145,42 @@ G_RX_UAV_FEEDER_DBI = 30.7  # UAV-side receive antenna gain for the HAPS->UAV
 # los_probability). The HAPS tier (haps_a2g_pathloss_db) uses pure FSPL with no
 # landscape dependence, per Arani, Hu & Zhu (2023) Eq. 2 -- see its docstring.
 #   alpha, beta, xi -> EXACT LoS-probability model params from Holis & Pechac (2008) Table I
-#   eta_los         -> mean excess path loss for LoS   [dB]  (VERIFY vs Table 1)
-#   eta_nlos        -> mean excess path loss for NLoS  [dB]  (VERIFY vs Table 1)
-#   PHASE 2 TODO: Arani et al. Table 1 gives a log-distance formula instead
-#   (L_z = delta_z + eta_z*log10(d) + chi_z) for their one simulated
-#   environment (alpha=0.1, beta=750, xi=8, matching "suburban" below):
-#   delta=FSPL(1m) [recompute at this project's 2GHz, Arani used 28GHz],
-#   path-loss exponent eta_LoS/NLoS=2/3, shadowing sigma_LoS/NLoS=5.8/8.7 dB.
-#   Not yet adopted here; eta_los/eta_nlos below remain flat per-landscape
-#   dB offsets, unverified beyond the "suburban" alpha/beta/xi row.
+#   Additional shadowing (LoS zero-mean, sigma 4 dB; NLoS mu(theta), sigma(theta)) comes
+#   from Holis & Pechac (2008) Eq. (4) and Table IV, not from per-landscape offsets.
+#   Arani et al. (2023) Table 1 is not used for shadowing.
 ENVIRONMENTS = {
     # alpha: built-up land ratio (0-1); beta: buildings per km^2; xi: building-height param [m]
-    "suburban":    dict(alpha=0.1, beta=750.0, xi=8.0,   eta_los=0.1, eta_nlos=21.0),
-    "urban":       dict(alpha=0.3, beta=500.0, xi=15.0,  eta_los=1.0, eta_nlos=20.0),
-    "dense_urban": dict(alpha=0.5, beta=300.0, xi=20.0,  eta_los=1.6, eta_nlos=23.0),
-    "high_rise":   dict(alpha=0.5, beta=300.0, xi=50.0,  eta_los=2.3, eta_nlos=34.0),
+    # (Holis & Pechac 2008, Table I, ITU-R P.1410 parameters; gamma = xi)
+    "suburban":    dict(alpha=0.1, beta=750.0, xi=8.0),
+    "urban":       dict(alpha=0.3, beta=500.0, xi=15.0),
+    "dense_urban": dict(alpha=0.5, beta=300.0, xi=20.0),
+    "high_rise":   dict(alpha=0.5, beta=300.0, xi=50.0),
 }
+
+# Additional shadowing for the UAV-to-UE hop, Holis & Pechac (2008) Eq. (4) and Table IV
+# (2 GHz, all environments). Elevation theta in degrees; mu, sigma in dB:
+#   mu(theta)    = (g + theta) / (h + i*theta)
+#   sigma(theta) = (g + theta) / (h + i*theta)   (separate g, h, i for sigma)
+# LoS: zero-mean location variability, sigma = 4 dB (midpoint of the paper's 3-5 dB range).
+SHADOW_LOS_SIGMA_DB = 4.0
+SHADOW_TABLE_IV = {
+    "lo": dict(mu=(2.55, 0.0594, 0.0406), sigma=(-12.96, -1.076, 0.0780)),     # 0 <= theta < 10
+    "hi": dict(mu=(-94.20, -3.44, 0.0318), sigma=(-89.55, -8.87, 0.0927)),     # 10 <= theta < 90
+}
+
+
+def holis_nlos_shadowing_db(theta_deg):
+    """Mean and standard deviation (dB) of the NLoS additional shadowing loss, Eq. (4)."""
+    theta = np.clip(np.asarray(theta_deg, dtype=float), 0.0, 89.0)
+    lo, hi = SHADOW_TABLE_IV["lo"], SHADOW_TABLE_IV["hi"]
+    use_lo = theta < 10.0
+    mu = np.where(use_lo,
+                  (lo["mu"][0] + theta) / (lo["mu"][1] + lo["mu"][2] * theta),
+                  (hi["mu"][0] + theta) / (hi["mu"][1] + hi["mu"][2] * theta))
+    sigma = np.where(use_lo,
+                     (lo["sigma"][0] + theta) / (lo["sigma"][1] + lo["sigma"][2] * theta),
+                     (hi["sigma"][0] + theta) / (hi["sigma"][1] + hi["sigma"][2] * theta))
+    return mu, np.abs(sigma)
 
 
 # ----------------------------------------------------------------------
@@ -425,14 +441,19 @@ def uav_a2g_pathloss_db(r_horiz_m, h_uav_m, f_hz=F_UAV_HZ, env="urban", h_user_m
     r_horiz_m = np.asarray(r_horiz_m, dtype=float)
     dh = h_uav_m - h_user_m
     d_3d = np.sqrt(r_horiz_m**2 + dh**2)
+    theta_deg = np.degrees(np.arctan2(dh, np.maximum(r_horiz_m, 1e-9)))
 
     p_los = los_probability(r_horiz_m, h_uav_m, h_user_m, env)
     p_nlos = 1.0 - p_los
 
-    base = fspl_db(f_hz, d_3d)
-    pl_los = base + ENVIRONMENTS[env]["eta_los"]
-    pl_nlos = base + ENVIRONMENTS[env]["eta_nlos"]
-    return p_los * pl_los + p_nlos * pl_nlos
+    # Expected linear gain, not an average of dB losses: the shadowing terms are
+    # log-normal in linear gain, E[10^(-X/10)] = exp(-a*mu + (a*sigma)^2/2), a = ln(10)/10.
+    a = np.log(10.0) / 10.0
+    mu_nlos, sigma_nlos = holis_nlos_shadowing_db(theta_deg)
+    g_los = np.exp((a * SHADOW_LOS_SIGMA_DB) ** 2 / 2.0)              # zero-mean LoS shadowing
+    g_nlos = np.exp(-a * mu_nlos + (a * sigma_nlos) ** 2 / 2.0)       # NLoS mean + spread
+    g_avg = 10.0 ** (-fspl_db(f_hz, d_3d) / 10.0) * (p_los * g_los + p_nlos * g_nlos)
+    return -10.0 * np.log10(g_avg)
 
 
 # ----------------------------------------------------------------------
@@ -446,52 +467,66 @@ def uav_a2g_pathloss_db(r_horiz_m, h_uav_m, f_hz=F_UAV_HZ, env="urban", h_user_m
 #     P.618 specifies: fade_depth(p) = k * (freq_ghz)^a * (elevation_deg)^b * std_dev(p)
 #     where p is time percentage (0.1% to 10% typical).
 # ----------------------------------------------------------------------
-def scintillation_fade_depth_db(p_time_percent, elevation_deg, freq_ghz=20.0):
-    """
-    ITU P.618 scintillation fade depth vs. time percentage.
+# ITU-R P.618 tropospheric scintillation fade A_s(p) [dB], computed with itur.models.itu618
+# .scintillation_attenuation at the site 28.61 N, 77.21 E, T = 15 C, RH = 60 %, P = 1010 hPa,
+# eta = 0.5. Aperture D: 0.31 m (gateway dish, 38 GHz; see the working-set antennas) and
+# 1.0 m (2.1 GHz reference aperture, stated assumption). Rows: elevation (deg); columns:
+# exceedance p (%) = 0.01, 0.1, 1, 10. Tabulated so the model runs without itur at runtime.
+SCINT_P_PERCENT = np.array([0.01, 0.1, 1.0, 10.0])
+SCINT_ELEV_DEG = np.array([5.0, 10.0, 15.0, 20.0, 30.0, 45.0, 60.0, 75.0, 89.86])
+SCINT_TABLE_DB = {
+    38.0: np.array([
+        [4.0367, 2.7168, 1.6829, 0.7298], [1.7624, 1.1861, 0.7347, 0.3186],
+        [1.0902, 0.7337, 0.4545, 0.1971], [0.7793, 0.5245, 0.3249, 0.1409],
+        [0.4930, 0.3318, 0.2055, 0.0891], [0.3244, 0.2184, 0.1353, 0.0587],
+        [0.2539, 0.1709, 0.1059, 0.0459], [0.2225, 0.1497, 0.0928, 0.0402],
+        [0.2133, 0.1436, 0.0889, 0.0386]]),
+    2.1: np.array([
+        [0.7461, 0.5021, 0.3110, 0.1349], [0.3259, 0.2193, 0.1359, 0.0589],
+        [0.2017, 0.1358, 0.0841, 0.0365], [0.1442, 0.0971, 0.0601, 0.0261],
+        [0.0913, 0.0615, 0.0381, 0.0165], [0.0601, 0.0405, 0.0251, 0.0109],
+        [0.0471, 0.0317, 0.0196, 0.0085], [0.0413, 0.0278, 0.0172, 0.0075],
+        [0.0396, 0.0266, 0.0165, 0.0072]]),
+}
 
-    Empirical fit for K-band HAPS feeders:
-    Fade depth increases with higher frequency (more susceptible to turbulence).
-    Decreases with higher elevation angle (shorter path through troposphere).
+
+def scintillation_fade_depth_db(p_time_percent, elevation_deg, freq_ghz=38.0):
+    """
+    ITU-R P.618 tropospheric scintillation fade depth A_s(p) [dB], from the tabulated
+    itur values (SCINT_TABLE_DB). Interpolated linearly in elevation and log-linearly in p.
 
     Args:
-        p_time_percent: time percentage (0.1 to 10 range, e.g., 1.0 = 1% of time)
-        elevation_deg: elevation angle [degrees]
-        freq_ghz: frequency [GHz], default 20 (K-band for HAPS feeders)
+        p_time_percent: exceedance time percentage, 0.01 to 10 (1.0 = 1 % of the time)
+        elevation_deg: elevation angle [degrees], 5 to 89.86 (clipped to this range)
+        freq_ghz: 38.0 (gateway link) or 2.1 (service/relay link); other values are rejected
 
     Returns:
-        fade_depth_db: median fade depth [dB] at time percentage p
-
-    Reference: ITU-R P.618-13, Annex 2 (empirical model)
+        fade_depth_db: scintillation fade [dB] exceeded for p % of the time
     """
-    # Clip elevation to 5-90 degrees (P.618 valid range)
-    elev = np.clip(elevation_deg, 5.0, 90.0)
+    if 1.5 <= freq_ghz <= 2.5:
+        table = SCINT_TABLE_DB[2.1]       # S-band service/relay link (tabulated at 2.1 GHz)
+    elif 30.0 <= freq_ghz <= 40.0:
+        table = SCINT_TABLE_DB[38.0]      # Ka-band gateway/feeder link
+    else:
+        raise ValueError(f"No P.618 scintillation table for {freq_ghz} GHz")
+    elev = np.clip(np.asarray(elevation_deg, dtype=float), SCINT_ELEV_DEG[0], SCINT_ELEV_DEG[-1])
+    p = np.clip(np.asarray(p_time_percent, dtype=float), SCINT_P_PERCENT[0], SCINT_P_PERCENT[-1])
 
-    # Frequency scaling: higher frequency → more fading
-    # Approximately proportional to f^(-0.5) in free space, but turbulence scales ~f^2
-    # Empirical: fading ∝ f^0.5 to f^1.0 depending on model variant
-    freq_factor = (freq_ghz / 20.0) ** 0.7
-
-    # Elevation scaling: lower angle = longer path, more fading
-    # Empirical: fading ∝ 1 / sin(elevation)
-    elev_rad = np.radians(elev)
-    elev_factor = 1.0 / np.sin(elev_rad)
-
-    # Time percentage scaling: deeper fades occur at lower time percentages
-    # Empirical: fade_depth ∝ sqrt(log(1/p)) where p is fractional time
-    p_frac = p_time_percent / 100.0
-    time_factor = np.sqrt(np.abs(np.log(p_frac + 1e-6)))
-
-    # Reference fade depth at p=1%, f=20 GHz, elevation=30°
-    # ITU P.618 typical value: ~2-3 dB median fade depth at 1%
-    ref_fade_db = 2.5
-
-    fade_db = ref_fade_db * freq_factor * elev_factor * time_factor
-    return fade_db
+    # Interpolate in elevation for each tabulated p, then in log(p) across the p columns.
+    per_p = np.stack([np.interp(elev, SCINT_ELEV_DEG, table[:, j])
+                      for j in range(len(SCINT_P_PERCENT))], axis=-1)
+    log_p = np.log(SCINT_P_PERCENT)
+    out = np.empty(np.broadcast(elev, p).shape)
+    e_b, p_b = np.broadcast_arrays(elev, p)
+    per_p_b = np.broadcast_to(per_p, e_b.shape + (len(SCINT_P_PERCENT),))
+    for idx in np.ndindex(e_b.shape):
+        vals = per_p_b[idx]
+        out[idx] = np.exp(np.interp(np.log(p_b[idx]), log_p, np.log(vals)))
+    return out if out.ndim else float(out)
 
 
 def scintillation_fading_envelope(time_samples, p_time_percent, elevation_deg,
-                                   freq_ghz=20.0, dist_km=50.0, distribution='log_normal'):
+                                   freq_ghz=38.0, dist_km=50.0, distribution='log_normal'):
     """
     Generate time-varying scintillation fading envelope for a given time percentage.
 
@@ -565,7 +600,7 @@ def sinr_db(p_rx_dbm, interference_dbm=None, noise_dbm=NOISE_DBM):
     return 10.0 * np.log10(p_rx_lin / denom)
 
 
-def feeder_link_loss_with_scintillation(distance_km, elevation_deg, freq_ghz=20.0,
+def feeder_link_loss_with_scintillation(distance_km, elevation_deg, freq_ghz=38.0,
                                         p_time_percent=1.0, include_scint=True):
     """
     Total feeder link loss (HAPS ↔ Gateway) including scintillation fading.
@@ -658,11 +693,62 @@ def relay_two_hop_capacity_bps_hz(feeder_dist_km, feeder_elevation_deg, gw_ue_di
     }
 
 
+def f699_sidelobe_gain_dbi(off_axis_deg):
+    """ITU-R F.699 reference sidelobe envelope, G = 32 - 25 log10(phi) dBi for 1 <= phi < 48 deg,
+    floored at -10 dBi (used as the interferer sidelobe gain, see the working-set assumption)."""
+    phi = np.clip(np.asarray(off_axis_deg, dtype=float), 1.0, 180.0)
+    return np.maximum(32.0 - 25.0 * np.log10(phi), -10.0)
+
+
+def haps_interference_at_uav_dbm(r_horiz_m, h_uav_m=UAV_ALT_M, h_haps_m=HAPS_ALT_M,
+                                 spacing_km=65.0, g_rx_dbi=G_RX_UAV_FEEDER_DBI,
+                                 p_time_percent=1.0, n_azimuth=360):
+    """
+    Co-channel interference power [dBm] at a UAV hovering at horizontal distance r_horiz_m from
+    the serving HAPS nadir, from the two other HAPS of the 65 km equilateral constellation.
+
+    Each interferer transmits P_TX_HAPS_DBM with its beam on its own service area, so the UAV is
+    seen through the sidelobe (F.699 envelope, -10 dBi floor). The power is averaged over the
+    UAV's azimuth around the serving HAPS, in linear units.
+    """
+    if np.ndim(r_horiz_m) > 0:  # one value per user (vectorised callers)
+        return np.array([haps_interference_at_uav_dbm(float(x), h_uav_m, h_haps_m, spacing_km,
+                                                      g_rx_dbi, p_time_percent, n_azimuth)
+                         for x in np.asarray(r_horiz_m, dtype=float).ravel()]).reshape(np.shape(r_horiz_m))
+    phi = np.linspace(0.0, 2.0 * np.pi, n_azimuth, endpoint=False)
+    r = float(r_horiz_m)
+    dh = h_haps_m - h_uav_m
+    # Interferer positions: I1 at (D, 0), I2 at (D/2, D*sqrt(3)/2), D = spacing.
+    d_side = spacing_km * 1000.0
+    interferers = [(d_side, 0.0), (d_side / 2.0, d_side * np.sqrt(3.0) / 2.0)]
+    total_lin = np.zeros_like(phi)
+    for ix, iy in interferers:
+        ux, uy = r * np.cos(phi), r * np.sin(phi)
+        d_h = np.sqrt((ux - ix) ** 2 + (uy - iy) ** 2)          # horizontal interferer-UAV distance
+        slant_km = np.sqrt(d_h ** 2 + dh ** 2) / 1000.0
+        elev_deg = np.degrees(np.arctan2(dh, np.maximum(d_h, 1e-9)))
+        off_axis_deg = 90.0 - elev_deg                           # angle from interferer nadir boresight
+        g_s = f699_sidelobe_gain_dbi(off_axis_deg)
+        # UAV receive gain toward the interferer: the UAV array points at the serving HAPS,
+        # so the interferer is seen off-boresight (F.699 envelope, -10 dBi floor).
+        u_to_s = np.stack([-ux, -uy, np.full_like(ux, dh)], axis=-1)     # UAV -> serving HAPS
+        u_to_i = np.stack([ix - ux, iy - uy, np.full_like(ux, dh)], axis=-1)  # UAV -> interferer
+        cos_ang = np.sum(u_to_s * u_to_i, axis=-1) / (
+            np.linalg.norm(u_to_s, axis=-1) * np.linalg.norm(u_to_i, axis=-1))
+        rx_off_deg = np.degrees(np.arccos(np.clip(cos_ang, -1.0, 1.0)))
+        g_rx = np.minimum(g_rx_dbi, f699_sidelobe_gain_dbi(rx_off_deg))
+        loss_db = feeder_link_loss_with_scintillation(slant_km, elev_deg, freq_ghz=38.0,
+                                                      p_time_percent=p_time_percent)
+        p_rx_dbm = P_TX_HAPS_DBM + g_s + g_rx - loss_db
+        total_lin += 10.0 ** (p_rx_dbm / 10.0)
+    return 10.0 * np.log10(np.mean(total_lin))
+
+
 def uav_relay_two_hop_capacity_bps_hz(r_horiz_m, h_uav_m=UAV_ALT_M, h_haps_m=HAPS_ALT_M,
                                        env="urban", uav_ue_horiz_m=UAV_RELAY_HOVER_HORIZ_M,
                                        p_tx_uav_dbm=P_TX_UAV_DBM, f_uav_ue_hz=F_UAV_HZ,
                                        h_user_m=1.5, p_time_percent=1.0, include_scint=True,
-                                       noise_dbm=NOISE_DBM):
+                                       noise_dbm=NOISE_DBM, include_interference=True):
     """
     End-to-end decode-and-forward (DF) capacity for the HAPS -> UAV -> UE
     relay path.
@@ -712,9 +798,13 @@ def uav_relay_two_hop_capacity_bps_hz(r_horiz_m, h_uav_m=UAV_ALT_M, h_haps_m=HAP
         slant_km, elevation_deg, freq_ghz=38.0, p_time_percent=p_time_percent,
         include_scint=include_scint,
     )
+    interference_dbm = (haps_interference_at_uav_dbm(r_horiz_m, h_uav_m, h_haps_m,
+                                                     p_time_percent=p_time_percent)
+                        if include_interference else None)
     sinr_haps_uav_db = sinr_db(rx_power_dbm(P_TX_HAPS_DBM, haps_uav_loss_db,
                                              g_tx_dbi=G_TX_HAPS_FEEDER_DBI,
-                                             g_rx_dbi=G_RX_UAV_FEEDER_DBI), noise_dbm=noise_dbm)
+                                             g_rx_dbi=G_RX_UAV_FEEDER_DBI),
+                               interference_dbm=interference_dbm, noise_dbm=noise_dbm)
     capacity_haps_uav = np.log2(1.0 + 10.0 ** (np.asarray(sinr_haps_uav_db) / 10.0))
 
     uav_ue_loss_db = uav_a2g_pathloss_db(uav_ue_horiz_m, h_uav_m, f_hz=f_uav_ue_hz, env=env, h_user_m=h_user_m)
@@ -1279,11 +1369,11 @@ def make_plots(outdir=None):
 
     fade_vs_time_data = {}
     for elev in elevations:
-        fade_vs_time_data[elev] = [scintillation_fade_depth_db(p, elev, freq_ghz=20.0) for p in p_time_range]
+        fade_vs_time_data[elev] = [scintillation_fade_depth_db(p, elev, freq_ghz=38.0) for p in p_time_range]
 
     fade_vs_elev_data = {}
     for p_time in time_percentages:
-        fade_vs_elev_data[p_time] = [scintillation_fade_depth_db(p_time, elev, freq_ghz=20.0) for elev in elevations_range]
+        fade_vs_elev_data[p_time] = [scintillation_fade_depth_db(p_time, elev, freq_ghz=38.0) for elev in elevations_range]
 
     fig_combined, axes_combined = plt.subplots(1, 2, figsize=(14, 5))
 
@@ -1338,7 +1428,7 @@ def make_plots(outdir=None):
     # --- Plot 10: Deterministic vs. Faded Feeder Link Loss (SPLIT INTO 2 SUBFIGURES) ---
     distances_km = np.linspace(20, 200, 100)
     elev_gateway = 30.0
-    freq_feeder = 20.0
+    freq_feeder = 38.0
 
     deterministic_loss = [feeder_link_loss_with_scintillation(d, elev_gateway, freq_feeder,
                                                                include_scint=False) for d in distances_km]
@@ -1448,15 +1538,15 @@ def make_plots(outdir=None):
     fading_data_11 = {}
     for p_time in time_percentages_demo:
         fading_log_normal = scintillation_fading_envelope(n_samples, p_time, elev_demo_ts,
-                                                          freq_ghz=20.0, dist_km=distance_demo_ts,
+                                                          freq_ghz=38.0, dist_km=distance_demo_ts,
                                                           distribution='log_normal')
         fading_gamma = scintillation_fading_envelope(n_samples, p_time, elev_demo_ts,
-                                                     freq_ghz=20.0, dist_km=distance_demo_ts,
+                                                     freq_ghz=38.0, dist_km=distance_demo_ts,
                                                      distribution='gamma')
         fading_data_11[p_time] = {
             'log_normal_db': 20.0 * np.log10(fading_log_normal),
             'gamma_db': 20.0 * np.log10(fading_gamma),
-            'fade_depth': scintillation_fade_depth_db(p_time, elev_demo_ts, freq_ghz=20.0)
+            'fade_depth': scintillation_fade_depth_db(p_time, elev_demo_ts, freq_ghz=38.0)
         }
 
     time_axis = np.arange(n_samples)

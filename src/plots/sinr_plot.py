@@ -2,13 +2,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
-# Environment excess loss parameters (Holis & Pechac 2008)
-ENVIRONMENTS = {
-    'suburban': dict(eta_los=0.1, eta_nlos=21.0),
-    'urban': dict(eta_los=1.0, eta_nlos=20.0),
-    'dense_urban': dict(eta_los=1.6, eta_nlos=23.0),
-    'high_rise': dict(eta_los=2.3, eta_nlos=34.0),
-}
+# Additional shadowing (Holis & Pechac 2008, Eq. 4 and Table IV, 2 GHz, all environments):
+# the NLoS mean at 45 deg elevation is shown in the panel title; LoS is zero-mean, sigma 4 dB.
+from models.channel_model import holis_nlos_shadowing_db  # noqa: E402
 
 def generate_haps_sinr_chart(csv_file, output_png=None):
     """
@@ -51,10 +47,9 @@ def generate_haps_sinr_chart(csv_file, output_png=None):
 
         ax1.set_xlabel('Distance [m]', fontsize=10, color='#333333')
         ax1.set_ylabel('SINR [dB]', fontsize=10, color='#333333')
-        env_key = landscape.lower()
-        eta_los = ENVIRONMENTS.get(env_key, {}).get('eta_los', '?')
-        eta_nlos = ENVIRONMENTS.get(env_key, {}).get('eta_nlos', '?')
-        title_text = f"{landscape.replace('_', ' ').title()}\nη_LoS={eta_los} dB, η_NLoS={eta_nlos} dB"
+        mu_nlos_45, _ = holis_nlos_shadowing_db(45.0)
+        title_text = (f"{landscape.replace('_', ' ').title()}\n"
+                      f"LoS zero-mean (σ 4 dB), NLoS mean {float(mu_nlos_45):.1f} dB at 45°")
         ax1.set_title(title_text, fontsize=10, fontweight='bold', color='#333333')
         ax1.set_xticks(x)
         ax1.set_xticklabels([f'{int(d/1000):,d}km' if d >= 1000 else f'{int(d)}m'
