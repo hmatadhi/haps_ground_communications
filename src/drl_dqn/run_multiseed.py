@@ -34,8 +34,15 @@ from train_dqn_real import MAX_STEPS, max_sinr_policy, random_policy, run_episod
 
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 OUT_DIR = os.path.join(ROOT, "data", "processed", "dqn_multiseed")
-SEEDS = [0, 1, 2, 3, 4]
+SEEDS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 METRICS = ["reward_per_step", "jain", "outage", "soc"]
+# Raised from 400 (the original budget, tuned for the pre-fix environment where UAV relay
+# was usually a *good* option) to 2400 after the UAV-placement fix made 3 of 6 actions
+# near-permanent traps: 400 episodes left training still improving noisily (eval reward
+# -29 vs Max-SINR's -14); 1600 nearly closed the gap, and the curve was still trending up,
+# so this runs further to let it fully converge. Cycles through the 400 real episodes
+# (RealEpisodeEnv wraps around) rather than requiring more raw training data.
+N_TRAIN_EPISODES = 2400
 
 
 def train_dqn(seed: int, train_eps, device: str) -> DQNAgent:
@@ -43,7 +50,7 @@ def train_dqn(seed: int, train_eps, device: str) -> DQNAgent:
     torch.manual_seed(seed)
     env = RealEpisodeEnv(train_eps, seed=seed)
     agent = DQNAgent(env.state_dim, env.n_actions, seed=seed, device=device)
-    for _ in range(len(train_eps)):
+    for _ in range(N_TRAIN_EPISODES):
         s = env.reset()
         for _ in range(MAX_STEPS):
             actions = agent.act_batch(s)

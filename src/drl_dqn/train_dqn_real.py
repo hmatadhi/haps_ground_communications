@@ -40,21 +40,34 @@ EVAL_EVERY = 10
 MAX_STEPS = 24
 
 
+_DECOMP_KEYS = ("term_throughput", "term_severe", "term_degraded", "term_fairness",
+                "term_energy", "term_low_battery", "frac_severe", "frac_degraded")
+
+
 def run_episode(env, policy, agent=None):
     """Run one episode with policy(env, states) -> actions. Returns per-episode metrics."""
     s = env.reset()
     rewards, info = [], {}
+    decomp = {k: [] for k in _DECOMP_KEYS}
     for _ in range(MAX_STEPS):
         actions = policy(env, s)
         s, r, done, info = env.step(actions)
         rewards.append(r.mean())
-    return {
+        for k in _DECOMP_KEYS:
+            if k in info:
+                decomp[k].append(info[k])
+    out = {
         "reward_per_step": float(np.mean(rewards)),
         "jain": float(info["jain_throughput"]),   # reported: Jain over per-user throughput
         "jain_sinr": float(info["jain_index"]),   # reward term: Jain over linear SINR
         "outage": int(info["n_outage"]),
         "soc": float(np.mean(info["battery_soc"])),
     }
+    # Additive: mean per-step reward-term decomposition, only when the env provides it.
+    for k, v in decomp.items():
+        if v:
+            out[k] = float(np.mean(v))
+    return out
 
 
 def dqn_policy(agent):

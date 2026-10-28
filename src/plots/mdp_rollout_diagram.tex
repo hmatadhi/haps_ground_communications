@@ -1,0 +1,36 @@
+% MDP rollout diagram, pulled out of HAPS_SHORTENED_FINAL.tex on 2026-10-27.
+% Not currently included in the main paper -- tikz/pgf was erroring on this
+% machine's MiKTeX install (pgfmathfunctions.random.code.tex, "Missing
+% number" at \c@pgfmath@counta) and we chose not to spend time triaging a
+% nice-to-have figure. Re-add to the main .tex (and restore
+% \usepackage{tikz} + \usetikzlibrary{positioning,arrows.meta,calc} to the
+% preamble) once the MiKTeX pgf issue is sorted out or on a working machine.
+%
+% Caption used in the paper was:
+% "Rolled-out MDP: at each hour $t$, the DQN observes state $s_t$
+% (21-dimensional, below), selects action $a_t\in\{0,\dots,5\}$ by
+% maximizing its learned $Q_\theta$, and receives reward $r_t$
+% (Eq.~\eqref{eq:reward}) as the environment transitions to $s_{t+1}$."
+% label: fig:mdp-rollout
+%
+% Accompanying prose paragraph (placed right after the figure in the paper):
+% "A DQN approximates the action-value function $Q_\theta(s_t,a_t)$ for
+% this MDP and selects $a_t=\arg\max_a Q_\theta(s_t,a)$ at each step. It is
+% trained via temporal-difference (TD) learning: the network is updated
+% toward the TD target $r_t+\gamma\max_a Q_\theta(s_{t+1},a)$, bootstrapping
+% from its own next-state estimate rather than waiting for the full
+% episode's return, using experience replay and a target network for
+% stability~\cite{mnih2015dqn}."
+
+\begin{tikzpicture}[node distance=1.15cm, every node/.style={font=\scriptsize}]
+\node[draw, circle, minimum size=0.6cm] (s0) {$s_t$};
+\node[draw, circle, minimum size=0.6cm, right=1.35cm of s0] (s1) {$s_{t+1}$};
+\node[draw, circle, minimum size=0.6cm, right=1.35cm of s1] (s2) {$s_{t+2}$};
+\node[right=0.55cm of s2] (dots) {$\cdots$};
+\draw[-{Stealth[length=2mm]}, thick] (s0) -- node[above]{$a_t$} node[below]{$r_t$} (s1);
+\draw[-{Stealth[length=2mm]}, thick] (s1) -- node[above]{$a_{t+1}$} node[below]{$r_{t+1}$} (s2);
+\draw[-{Stealth[length=2mm]}, thick] (s2) -- (dots);
+\coordinate (mid) at ($(s0)!0.5!(s1)$);
+\node[draw, dashed, rectangle, align=center, font=\tiny, above=0.7cm of mid] (dqn) {DQN: $a_t{=}\arg\max_a Q_\theta(s_t,a)$};
+\draw[-{Stealth[length=1.5mm]}, dashed] (dqn.south) -- ++(0,-0.3);
+\end{tikzpicture}

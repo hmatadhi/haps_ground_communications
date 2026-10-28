@@ -9,10 +9,20 @@ uav_relay_two_hop_capacity_bps_hz(): a 38 GHz HAPS->UAV first hop (feeder-
 style slant path with ITU-P.618 scintillation) bottlenecked, decode-and-
 forward, against a 2 GHz, landscape-dependent UAV->UE second hop.
 
-Sweeps HAPS->UAV horizontal distance (0-100 km, matching the Relay rows in
-generate_pathloss_table.py) across the four ENVIRONMENTS landscapes, since
--- unlike the Gateway relay's access hop -- the UAV->UE hop uses the
-building-blockage LoS/NLoS model and is landscape-dependent.
+The single relay UAV is static (Table 1: count=1, no mobility) and fixed at
+the HAPS triangle's centroid -- so the HAPS->UAV feeder distance is now a
+CONSTANT (R_HAPS_UAV_M, the triangle's circumradius), not the sweep variable.
+This replaces an earlier version of this script that (incorrectly) assumed
+the UAV always hovers within a small fixed offset of whichever user it
+serves, which made the UAV->UE hop unrealistically good at every distance.
+
+Sweeps horizontal distance from the serving HAPS (0-100 km, matching the
+Relay rows in generate_pathloss_table.py), azimuth-averaged around that HAPS
+(matching the direct-link SINR's existing averaging convention just above),
+across the four ENVIRONMENTS landscapes. Since the UAV sits off-axis from
+the serving HAPS's nadir, a given azimuth/radius determines a different
+real UAV->UE distance -- that distance, not the sweep variable itself,
+now drives the access hop.
 """
 
 import sys
@@ -24,8 +34,21 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from models.channel_model import (
     haps_a2g_pathloss_db, rx_power_dbm, sinr_db, uav_relay_two_hop_capacity_bps_hz,
-    multi_node_sinr_db_spatial, HAPS_ALT_M, UAV_ALT_M, P_TX_HAPS_DBM, NOISE_DBM, ENVIRONMENTS,
+    haps_constellation_geometry, multi_node_sinr_db_spatial,
+    HAPS_ALT_M, UAV_ALT_M, P_TX_HAPS_DBM, NOISE_DBM, ENVIRONMENTS,
 )
+
+# Single static relay UAV (Table 1: count=1, no mobility), fixed at the HAPS triangle's
+# centroid -- matches haps_association_env.py's fix for the same previously-incorrect
+# "UAV always ~hovers next to whichever user it serves" assumption (reviewer feedback:
+# Table 1 says 1 static UAV, but that assumption made the UAV->UE hop unrealistically
+# good at every distance). With the UAV fixed at the centroid, the HAPS->UAV feeder
+# distance is CONSTANT (circumradius of the equilateral triangle, ~37.5 km at 65 km
+# spacing, the same for all three HAPS), while the UAV->UE access hop now varies with
+# each user's real distance from that one fixed point.
+_NODES = haps_constellation_geometry(spacing_km=65.0)
+_UAV_XY_M = np.mean([[_NODES[k][0], _NODES[k][1]] for k in ('serving', 'interferer1', 'interferer2')], axis=0)
+R_HAPS_UAV_M = float(np.linalg.norm(_UAV_XY_M - np.array([_NODES['serving'][0], _NODES['serving'][1]])))
 
 # Output directories (matches generate_relay_table.py's convention: run from
 # src/, write into src/appendix_data and src/appendix_tables, and a figure
@@ -66,13 +89,22 @@ for env in LANDSCAPES:
             for a in azimuths]))
         capacity_direct = float(np.log2(1.0 + 10.0 ** (sinr_direct_db / 10.0)))
 
-        # Relay HAPS->UAV->UE (clear-sky HAPS->UAV hop, landscape-dependent UAV->UE hop)
-        relay = uav_relay_two_hop_capacity_bps_hz(r_m, env=env, include_scint=True)
-        sinr_haps_uav_db = float(np.asarray(relay["sinr_haps_uav_db"]).flat[0])
-        sinr_uav_ue_db = float(np.asarray(relay["sinr_uav_ue_db"]).flat[0])
-        capacity_haps_uav = float(np.asarray(relay["capacity_haps_uav_bps_hz"]).flat[0])
-        capacity_uav_ue = float(np.asarray(relay["capacity_uav_ue_bps_hz"]).flat[0])
-        capacity_uav_relay = float(np.asarray(relay["capacity_uav_relay_bps_hz"]).flat[0])
+        # Relay HAPS->UAV->UE, with the UAV fixed at the centroid (see R_HAPS_UAV_M above):
+        # the feeder hop (HAPS->UAV) is now a constant distance, not r_m -- r_m instead
+        # drives the UAV->UE access hop's real distance, azimuth-averaged around the
+        # serving HAPS (same azimuthal averaging convention as the direct-link SINR
+        # just above), since the UAV sits off-axis from the serving HAPS's nadir.
+        uav_ue_dists_m = np.sqrt(
+            (r_m * np.cos(azimuths) - _UAV_XY_M[0]) ** 2 + (r_m * np.sin(azimuths) - _UAV_XY_M[1]) ** 2
+        )
+        relay_per_az = [uav_relay_two_hop_capacity_bps_hz(
+            r_horiz_m=R_HAPS_UAV_M, uav_ue_horiz_m=float(d), env=env, include_scint=True)
+            for d in uav_ue_dists_m]
+        sinr_haps_uav_db = float(np.mean([float(np.asarray(r["sinr_haps_uav_db"]).flat[0]) for r in relay_per_az]))
+        sinr_uav_ue_db = float(np.mean([float(np.asarray(r["sinr_uav_ue_db"]).flat[0]) for r in relay_per_az]))
+        capacity_haps_uav = float(np.mean([float(np.asarray(r["capacity_haps_uav_bps_hz"]).flat[0]) for r in relay_per_az]))
+        capacity_uav_ue = float(np.mean([float(np.asarray(r["capacity_uav_ue_bps_hz"]).flat[0]) for r in relay_per_az]))
+        capacity_uav_relay = float(np.mean([float(np.asarray(r["capacity_uav_relay_bps_hz"]).flat[0]) for r in relay_per_az]))
 
         rows.append({
             'Landscape': env,
@@ -134,7 +166,7 @@ latex_appendix = f"""\\begin{{table}}[htbp]
 \\centering
 \\small
 {latex_main}
-\\caption{{Table A.4: Direct (HAPS\\textrightarrow UE) vs. relay (HAPS\\textrightarrow UAV\\textrightarrow UE) link comparison, suburban and high-rise landscapes (best/worst case for the landscape-dependent second hop; full 4-landscape data in \\texttt{{appendix\\_data/UAV\\_relay\\_path\\_comparison.csv}}). The relay path is decode-and-forward: the 38\\,GHz HAPS\\textrightarrow UAV first hop (feeder-style slant path, UAV at {UAV_ALT_M:.0f}\\,m, with ITU-P.618 scintillation) is landscape-independent, while the 2\\,GHz UAV\\textrightarrow UE second hop uses the landscape-dependent LoS/NLoS blended model (\\S III.C). $C_{{\\text{{relay}}}} = \\min(C_{{\\text{{haps-uav}}}}, C_{{\\text{{uav-ue}}}})$, implemented in \\texttt{{uav\\_relay\\_two\\_hop\\_capacity\\_bps\\_hz()}}.}}
+\\caption{{Table A.4: Direct (HAPS\\textrightarrow UE) vs. relay (HAPS\\textrightarrow UAV\\textrightarrow UE) link comparison, suburban and high-rise landscapes, as a function of distance from the serving HAPS, azimuth-averaged (best/worst case for the landscape-dependent second hop; full 4-landscape data in \\texttt{{appendix\\_data/UAV\\_relay\\_path\\_comparison.csv}}). The relay UAV is static, fixed at the HAPS triangle's centroid ({UAV_ALT_M:.0f}\\,m altitude, {R_HAPS_UAV_M/1000:.1f}\\,km from each HAPS); the 38\\,GHz HAPS\\textrightarrow UAV feeder hop is therefore a constant, landscape-independent link, while the 2\\,GHz UAV\\textrightarrow UE access hop uses each user's real, azimuth-dependent distance to that fixed point with the landscape-dependent LoS/NLoS blended model (\\S III.C). $C_{{\\text{{relay}}}} = \\min(C_{{\\text{{haps-uav}}}}, C_{{\\text{{uav-ue}}}})$, implemented in \\texttt{{uav\\_relay\\_two\\_hop\\_capacity\\_bps\\_hz()}}.}}
 \\label{{table:app-uav-relay-comparison}}
 \\end{{table}}
 """
@@ -144,13 +176,14 @@ with open('appendix_tables/UAV_relay_path_comparison.tex', 'w') as f:
 print("[OK] LaTeX table saved (appendix): appendix_tables/UAV_relay_path_comparison.tex")
 
 # ============================================================================
-# Figure: SINR (dB) vs. HAPS->UAV distance -- direct link vs. both relay
-# hops. SINR (not capacity) is plotted because the HAPS->UAV hop collapses
-# to near-zero capacity within ~20 km, which is the key finding, but that
-# collapse is only legible on a dB scale; a linear bits/s/Hz axis compresses
-# the two relay hops into an indistinguishable line at the bottom. Landscape
-# only shifts the UAV->UE curve by <2 dB (see CSV for all 4 landscapes), so
-# suburban (best case) and high_rise (worst case) bracket the full range.
+# Figure: SINR (dB) vs. distance from the serving HAPS -- direct link vs.
+# both relay hops. SINR (not capacity) is plotted because the UAV->UE hop
+# collapses to near-zero capacity within ~20 km of the fixed UAV, which is
+# the key finding, but that collapse is only legible on a dB scale; a linear
+# bits/s/Hz axis compresses the relay curve into an indistinguishable line at
+# the bottom. Landscape only shifts the UAV->UE curve by <2 dB (see CSV for
+# all 4 landscapes), so suburban (best case) and high_rise (worst case)
+# bracket the full range. The HAPS->UAV hop is now flat (fixed UAV position).
 # ============================================================================
 
 COLOR_DIRECT = '#4C72B0'
@@ -175,9 +208,9 @@ ax.plot(sub_hr['Distance_km'], sub_hr['SINR_UAV_UE_dB'], '^--',
 
 ax.axhline(0, color='gray', linestyle=':', linewidth=1, label='0 dB (unity SINR)')
 
-ax.set_xlabel('HAPS–UAV horizontal distance [km]')
+ax.set_xlabel('Distance from serving HAPS [km]')
 ax.set_ylabel('SINR [dB]')
-ax.set_title('Direct Link vs. HAPS→UAV→UE Relay Hops')
+ax.set_title('Direct Link vs. HAPS→UAV→UE Relay Hops (static UAV at centroid)')
 ax.grid(True, alpha=0.3)
 ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.16), ncol=2, fontsize=9, frameon=False)
 fig.tight_layout()

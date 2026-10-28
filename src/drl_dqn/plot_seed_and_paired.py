@@ -56,7 +56,7 @@ def seed_stats_chart(dqn: pd.DataFrame, out: str) -> None:
             ax.set_ylim(-1, 1)
             ax.text(0.5, 0.5, "0 on every seed", transform=ax.transAxes, ha="center", va="center", fontsize=10)
     axes[0].legend(fontsize=8, loc="best")
-    fig.suptitle("LSTM + DQN across five seeds (Table VIII)", fontsize=11)
+    fig.suptitle(f"LSTM + DQN across {len(dqn)} seeds (Table VIII)", fontsize=11)
     fig.tight_layout()
     fig.savefig(out, dpi=150)
     plt.close(fig)
@@ -64,6 +64,7 @@ def seed_stats_chart(dqn: pd.DataFrame, out: str) -> None:
 
 def paired_forest_chart(dqn: pd.DataFrame, base: pd.DataFrame, out: str) -> None:
     rows = []
+    n_seeds = len(dqn)
     for name, sub in [("max-SINR (direct only)", "max-SINR"),
                       ("greedy throughput", "greedy-throughput")]:
         ref = base[base["base_policy"] == sub].set_index("seed")
@@ -81,7 +82,7 @@ def paired_forest_chart(dqn: pd.DataFrame, base: pd.DataFrame, out: str) -> None
     y = np.arange(len(rows))[::-1]
     for yi, (label, m, lo, hi, better, tie) in zip(y, rows):
         ax.errorbar(m, yi, xerr=[[m - lo], [hi - m]], fmt="o", color="tab:blue", capsize=4)
-        note = "tie (identical on all seeds)" if tie else f"{better}/5 seeds"
+        note = "tie (identical on all seeds)" if tie else f"{better}/{n_seeds} seeds"
         ax.text(1.02, yi, note, transform=ax.get_yaxis_transform(), va="center", fontsize=8)
     ax.axvline(0, color="black", lw=0.8, ls="--")
     ax.set_yticks(y)

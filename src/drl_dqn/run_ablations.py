@@ -28,8 +28,9 @@ from train_dqn_real import MAX_STEPS, run_episode  # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 OUT_DIR = os.path.join(ROOT, "data", "processed", "dqn_ablation")
-SEEDS = [0, 1, 2, 3, 4]
+SEEDS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 VARIANTS = ["lstm", "none", "oracle"]
+N_TRAIN_EPISODES = 2400  # see run_multiseed.py's comment: raised from 400 after the UAV fix
 
 
 def train_dqn(seed: int, train_eps, forecast: str, device: str) -> DQNAgent:
@@ -37,7 +38,7 @@ def train_dqn(seed: int, train_eps, forecast: str, device: str) -> DQNAgent:
     torch.manual_seed(seed)
     env = RealEpisodeEnv(train_eps, seed=seed, forecast=forecast)
     agent = DQNAgent(env.state_dim, env.n_actions, seed=seed, device=device)
-    for _ in range(len(train_eps)):
+    for _ in range(N_TRAIN_EPISODES):
         s = env.reset()
         for _ in range(MAX_STEPS):
             actions = agent.act_batch(s)

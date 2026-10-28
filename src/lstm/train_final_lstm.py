@@ -20,7 +20,7 @@ from train_lstm import FEATURES, MODEL_DIR, RainLSTM, build_table, make_windows
 TRAIN_YEARS = [2023, 2024, 2025]
 PAST = 24
 HORIZON = 6
-EPOCHS = 30
+EPOCHS = 4  # validated by early stopping on 2025 held out from a 2023-2024-only version of this model; see train_lstm_earlystop.py
 BATCH = 128
 SEED = 0
 

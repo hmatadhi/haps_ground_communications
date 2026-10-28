@@ -135,6 +135,20 @@ class HAPSAssociationEnv:
         nodes = cm.haps_constellation_geometry(spacing_km=self.spacing_km, h_haps_m=cm.HAPS_ALT_M)
         self.node_xy_m = np.array([[nodes[k][0], nodes[k][1]] for k in NODE_KEYS])  # (3, 2)
 
+        # Single static relay UAV (Table 1: count=1, no mobility), fixed at the HAPS
+        # triangle's centroid -- the same point Table 1 already assigns the Gateway,
+        # just at UAV altitude. For an equilateral triangle this is equidistant from
+        # all three HAPS (circumradius = spacing/sqrt(3)), so the HAPS->UAV feeder hop
+        # has one constant, moderate elevation (~27.5 deg at 65 km spacing) regardless
+        # of which HAPS relays or which user is served -- unlike a UAV that chases each
+        # user (the previous, incorrect assumption), which swung from near-nadir to an
+        # 11 deg worst case depending on the user's own distance from the HAPS. The
+        # trade-off, now correctly modeled, is that the UAV->UE access hop (2 GHz,
+        # building-blockage-limited) varies with each user's real distance from this
+        # one fixed point instead of being a constant, unrealistically short hop.
+        self.uav_xy_m = self.node_xy_m.mean(axis=0)  # (2,)
+        self._dist_haps_uav_m = np.linalg.norm(self.node_xy_m - self.uav_xy_m[None, :], axis=1)  # (3,)
+
         self.weather_state = None
         self.t = 0
         self.hour_of_day = 0.0
@@ -156,6 +170,12 @@ class HAPSAssociationEnv:
     def _compute_static_sinr_and_distance(self):
         """SINR (dB) and horizontal distance (km) from every user to every
         HAPS. Static for the episode since neither users nor HAPS move."""
+        # KNOWN ISSUE (not fixed here, flagged for a future pass): this samples r uniformly
+        # in RADIUS, not uniformly over AREA, so users are biased toward the center relative
+        # to Table 1's "uniform random in coverage" -- a true area-uniform disk sample is
+        # r = service_radius_m * sqrt(uniform(0,1)). Found while investigating the UAV
+        # relay coverage fix; left as-is since every result in this paper (not just the UAV
+        # analysis) was generated on this sampling, and revisiting it is a separate exercise.
         r = self.rng.uniform(0.0, self.service_radius_m, size=self.n_users)
         theta = self.rng.uniform(0.0, 2 * np.pi, size=self.n_users)
         self.user_xy_m = np.stack([r * np.cos(theta), r * np.sin(theta)], axis=1)
@@ -163,6 +183,9 @@ class HAPSAssociationEnv:
         dist_m = np.linalg.norm(
             self.user_xy_m[:, None, :] - self.node_xy_m[None, :, :], axis=2
         )  # (n_users, 3)
+
+        # Real horizontal distance from each user to the one fixed UAV (see __init__).
+        dist_uav_ue_m = np.linalg.norm(self.user_xy_m - self.uav_xy_m[None, :], axis=1)  # (n_users,)
 
         rx_lin = np.zeros((self.n_users, self.n_haps))
         for p in range(self.n_haps):
@@ -193,8 +216,12 @@ class HAPSAssociationEnv:
 
         uav_relay_capacity = np.zeros((self.n_users, self.n_haps))
         for p in range(self.n_haps):
+            # Feeder hop (HAPS_p -> UAV): fixed distance, same for every user, since the
+            # UAV doesn't move. Access hop (UAV -> UE): real per-user distance to that
+            # fixed point, not the old fixed 50 m hover-offset stand-in.
             uav_relay = cm.uav_relay_two_hop_capacity_bps_hz(
-                r_horiz_m=dist_m[:, p],
+                r_horiz_m=self._dist_haps_uav_m[p],
+                uav_ue_horiz_m=dist_uav_ue_m,
                 env=self.env,
             )
             uav_relay_capacity[:, p] = uav_relay["capacity_uav_relay_bps_hz"]
@@ -333,6 +360,18 @@ class HAPSAssociationEnv:
             "feeder_capacity_fraction": capacity_fraction,
             "n_gw_relay": int(np.sum(is_gw_relay)),
             "n_uav_relay": int(np.sum(is_uav_relay)),
+            # Additive reward-term decomposition (mean per-user contribution to `rewards`
+            # above); does not change any existing field, added for the reviewer-requested
+            # reward breakdown (why max-throughput, an upper bound on throughput alone, can
+            # lose on total reward).
+            "term_throughput": float(np.mean(self.omega_1 * effective_throughput)),
+            "term_severe": float(np.mean(individual_severe_penalty)),
+            "term_degraded": float(np.mean(individual_degraded_penalty)),
+            "term_fairness": float(self.omega_2 * jain),
+            "term_energy": float(-self.omega_3 * energy_penalty),
+            "term_low_battery": float(low_battery_penalty),
+            "frac_severe": float(np.mean(severe)),
+            "frac_degraded": float(np.mean(degraded)),
         }
         return self._states(), rewards, done, info
 
