@@ -1,0 +1,10 @@
+{
+  "gateway": {
+    "mode": "centroid"
+  },
+  "uav": {
+    "azimuth_mode": "good_sector",
+    "mode": "serving_nadir",
+    "offset_km": 0.1
+  }
+}

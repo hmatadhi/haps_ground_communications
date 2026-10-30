@@ -96,7 +96,7 @@ def main() -> None:
     ax.set_title(f"Real, LSTM, persistence and PreLSTM over 300 hours\n{title_range}")
     ax.set_xlabel("Hour in window")
     ax.set_ylabel("Rain attenuation (dB, P.618 at 38 GHz, 11.3°)")
-    ax.set_ylim(0, 15)
+    ax.set_ylim(0, 10)
     ax.grid(alpha=0.3)
     ax.legend(loc="upper left", fontsize=8, ncol=2)
     fig.tight_layout()

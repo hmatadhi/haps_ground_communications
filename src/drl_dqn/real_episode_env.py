@@ -101,9 +101,9 @@ class RealEpisodeEnv(HAPSAssociationEnv):
         self._set_weather(0)
         return self._states_real()
 
-    def step(self, actions):
+    def step(self, actions, feeder_choice=None):
         self._set_weather(self.t)  # current hour's real values for the reward
-        _, rewards, done, info = super().step(actions)
+        _, rewards, done, info = super().step(actions, feeder_choice=feeder_choice)
         if not done:
             self._set_weather(self.t)  # next hour's real values for the returned state
         return self._states_real(), rewards, done, info

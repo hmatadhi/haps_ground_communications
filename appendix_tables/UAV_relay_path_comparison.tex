@@ -1,28 +1,27 @@
 \begin{table}[htbp]
 \centering
 \small
-\resizebox{\columnwidth}{!}{%
 \begin{tabular}{lrrrrrl}
 \toprule
 Landscape & Distance km & Capacity Direct bps Hz & Capacity HAPS UAV bps Hz & Capacity UAV UE bps Hz & Capacity UAV Relay bps Hz & Bottleneck Hop \\
 \midrule
-suburban & 0 & 2.67 & 12.48 & 11.09 & 11.09 & UAV-UE \\
-suburban & 10 & 2.40 & 12.14 & 11.09 & 11.09 & UAV-UE \\
-suburban & 20 & 1.86 & 11.43 & 11.09 & 11.09 & UAV-UE \\
-suburban & 30 & 1.37 & 10.70 & 11.09 & 10.70 & HAPS-UAV \\
-suburban & 50 & 0.75 & 9.49 & 11.09 & 9.49 & HAPS-UAV \\
-suburban & 75 & 0.49 & 8.37 & 11.09 & 8.37 & HAPS-UAV \\
-suburban & 100 & 0.46 & 7.52 & 11.09 & 7.52 & HAPS-UAV \\
-high rise & 0 & 2.67 & 12.48 & 11.09 & 11.09 & UAV-UE \\
-high rise & 10 & 2.40 & 12.14 & 11.09 & 11.09 & UAV-UE \\
-high rise & 20 & 1.86 & 11.43 & 11.09 & 11.09 & UAV-UE \\
-high rise & 30 & 1.37 & 10.70 & 11.09 & 10.70 & HAPS-UAV \\
-high rise & 50 & 0.75 & 9.49 & 11.09 & 9.49 & HAPS-UAV \\
-high rise & 75 & 0.49 & 8.37 & 11.09 & 8.37 & HAPS-UAV \\
-high rise & 100 & 0.46 & 7.52 & 11.09 & 7.52 & HAPS-UAV \\
+suburban & 0 & 2.67 & 12.48 & 11.05 & 11.05 & UAV-UE \\
+suburban & 10 & 2.40 & 12.48 & 0.56 & 0.56 & UAV-UE \\
+suburban & 20 & 1.86 & 12.48 & 0.03 & 0.03 & UAV-UE \\
+suburban & 30 & 1.37 & 12.48 & 0.01 & 0.01 & UAV-UE \\
+suburban & 50 & 0.75 & 12.48 & 0.00 & 0.00 & UAV-UE \\
+suburban & 75 & 0.49 & 12.48 & 0.00 & 0.00 & UAV-UE \\
+suburban & 100 & 0.46 & 12.48 & 0.00 & 0.00 & UAV-UE \\
+high rise & 0 & 2.67 & 12.48 & 11.05 & 11.05 & UAV-UE \\
+high rise & 10 & 2.40 & 12.48 & 0.17 & 0.17 & UAV-UE \\
+high rise & 20 & 1.86 & 12.48 & 0.02 & 0.02 & UAV-UE \\
+high rise & 30 & 1.37 & 12.48 & 0.01 & 0.01 & UAV-UE \\
+high rise & 50 & 0.75 & 12.48 & 0.00 & 0.00 & UAV-UE \\
+high rise & 75 & 0.49 & 12.48 & 0.00 & 0.00 & UAV-UE \\
+high rise & 100 & 0.46 & 12.48 & 0.00 & 0.00 & UAV-UE \\
 \bottomrule
-\end{tabular}}
+\end{tabular}
 
-\caption{Table A.4: Direct (HAPS\textrightarrow UE) vs. relay (HAPS\textrightarrow UAV\textrightarrow UE) link comparison, suburban and high-rise landscapes (best/worst case for the landscape-dependent second hop; full 4-landscape data in \texttt{appendix\_data/UAV\_relay\_path\_comparison.csv}). The relay path is decode-and-forward: the 38\,GHz HAPS\textrightarrow UAV first hop (feeder-style slant path, UAV at 500\,m, with ITU-P.618 scintillation) is landscape-independent, while the 2\,GHz UAV\textrightarrow UE second hop uses the landscape-dependent LoS/NLoS blended model (\S III.C). $C_{\text{relay}} = \min(C_{\text{haps-uav}}, C_{\text{uav-ue}})$, implemented in \texttt{uav\_relay\_two\_hop\_capacity\_bps\_hz()}.}
+\caption{Table A.4: Direct (HAPS\textrightarrow UE) vs. relay (HAPS\textrightarrow UAV\textrightarrow UE) link comparison, suburban and high-rise landscapes, as a function of distance from the serving HAPS, azimuth-averaged (best/worst case for the landscape-dependent second hop; full 4-landscape data in \texttt{appendix\_data/UAV\_relay\_path\_comparison.csv}). The relay UAV is static, hovering at 500\,m altitude, 0.1\,km from the serving HAPS's nadir along the good-sector azimuth of Fig.~6; the 38\,GHz HAPS\textrightarrow UAV feeder hop is therefore a constant, near-zenith, landscape-independent link, while the 2\,GHz UAV\textrightarrow UE access hop uses each user's real, azimuth-dependent distance to that fixed point with the landscape-dependent LoS/NLoS blended model (\S III.C). $C_{\text{relay}} = \min(C_{\text{haps-uav}}, C_{\text{uav-ue}})$, implemented in \texttt{uav\_relay\_two\_hop\_capacity\_bps\_hz()}.}
 \label{table:app-uav-relay-comparison}
 \end{table}

@@ -16,6 +16,7 @@ P.618 effective path length for the chosen geometry before results go in the pap
 
 import argparse
 import os
+import sys
 
 import numpy as np
 import pandas as pd
@@ -28,12 +29,30 @@ ERA5_DIR = os.path.join(ROOT, "data", "raw", "era5")
 OUT_DIR = os.path.join(ROOT, "data", "processed", "lstm")
 MODEL_DIR = os.path.join(ROOT, "models", "lstm")
 
+_MODELS_DIR = os.path.join(ROOT, "src", "models")
+if _MODELS_DIR not in sys.path:
+    sys.path.insert(0, _MODELS_DIR)
+from geometry_config import compute_placement  # noqa: E402
+
 SITE_LAT, SITE_LON = 28.61, 77.21
 ERA5_LAT, ERA5_LON = 28.50, 77.25
 FREQ_GHZ = 38.0
-ELEV_DEG = 89.86         # HAPS (20 km) to gateway, near zenith (gateway geometry)
-GATEWAY_KM = 0.05        # ground gateway height (50 m)
-K_RAIN, ALPHA_RAIN = 0.3923, 0.8687   # P.838, 38 GHz, 89.86 deg (itur)
+# Gateway placement comes from config/geometry.json (see
+# src/models/geometry_config.py; defaults to today's static_gw branch
+# geometry -- Gateway fixed at the HAPS triangle's centroid, 37.53 km
+# horizontal offset, circumradius of the 65 km equilateral triangle, not
+# co-located under the HAPS -- see generate_relay_table.py /
+# battery_model.feeder_link_rain_effect_on_capacity()). The elevation (and
+# therefore the ITU-R P.838 specific-attenuation coefficients, which depend
+# on elevation via the H/V polarisation mix) is derived from that placement.
+# IMPORTANT: these constants set the LSTM's training LABEL -- if
+# config/geometry.json's Gateway placement changes, the model must be
+# retrained (train_lstm.py / train_lstm_earlystop.py / train_final_lstm.py /
+# train_forward_lstm.py) for the label to match the new geometry.
+_GW_PLACEMENT = compute_placement('gateway')
+ELEV_DEG = _GW_PLACEMENT['elevation_deg']      # HAPS (20 km) to Gateway, per configured placement
+GATEWAY_KM = _GW_PLACEMENT['alt_m'] / 1000.0   # ground gateway height (50 m AGL, unaffected by horizontal move)
+K_RAIN, ALPHA_RAIN = _GW_PLACEMENT['k_rain'], _GW_PLACEMENT['alpha_rain']  # P.838, 38 GHz, computed from ELEV_DEG
 H_RAIN_KM = 5.278                     # P.839 rain height, Delhi (itur)
 
 

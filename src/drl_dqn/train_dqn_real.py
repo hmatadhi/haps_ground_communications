@@ -41,17 +41,25 @@ MAX_STEPS = 24
 
 
 _DECOMP_KEYS = ("term_throughput", "term_severe", "term_degraded", "term_fairness",
-                "term_energy", "term_low_battery", "frac_severe", "frac_degraded")
+                "term_energy", "term_low_battery", "frac_severe", "frac_degraded",
+                "term_switch", "frac_switched")
 
 
 def run_episode(env, policy, agent=None):
-    """Run one episode with policy(env, states) -> actions. Returns per-episode metrics."""
+    """Run one episode with policy(env, states) -> actions. Returns per-episode metrics.
+
+    If `agent` is given, the SAME agent also makes the per-UAV feeder-HAPS choice each
+    hour (see haps_association_env.step()'s `feeder_choice`), via one extra forward pass
+    on a step-level feeder-context state (the per-user states' mean) -- not a per-user
+    action, and not a second network. Rule-based baselines (agent=None) fall back to
+    env.step()'s majority-vote default."""
     s = env.reset()
     rewards, info = [], {}
     decomp = {k: [] for k in _DECOMP_KEYS}
     for _ in range(MAX_STEPS):
         actions = policy(env, s)
-        s, r, done, info = env.step(actions)
+        feeder_choice = int(agent.act(s.mean(axis=0))) % env.n_haps if agent is not None else None
+        s, r, done, info = env.step(actions, feeder_choice=feeder_choice)
         rewards.append(r.mean())
         for k in _DECOMP_KEYS:
             if k in info:
@@ -82,7 +90,46 @@ def random_policy(env, s):
 
 def max_sinr_policy(env, s):
     # Best direct HAPS by SINR (actions 0..n_haps-1); the paper's closed-form baseline.
+    # NOTE: this reads env._sinr_db directly -- a free, instantaneous, noiseless SINR
+    # reading to all three HAPS, every hour. No real UE gets that for free (it would need
+    # to retune/measure each HAPS's beam and report back); see BoundedPollMaxSINR below
+    # for the same rule under a measurement budget a UE could actually meet.
     return np.argmax(env._sinr_db, axis=1)
+
+
+class BoundedPollMaxSINR:
+    """Max-SINR baseline under a realistic measurement budget: each user can only get a
+    fresh SINR reading for ONE of the three HAPS per hour (round-robin), and must act on
+    the last-known (possibly up to two hours stale) reading for the other two. Picks the
+    best among its currently-known readings, same decision rule as max_sinr_policy, but
+    without that policy's free, all-link, every-hour measurement.
+
+    Construct a new instance per episode (its memory must reset at episode boundaries);
+    passing `lambda a: BoundedPollMaxSINR()` as `make_policy` to evaluate_method does this.
+
+    INCOMPLETE as a measurement-overhead model -- do not treat a win/loss against this
+    baseline as a settled comparison. It still omits: the UE's battery/power draw from
+    doing the polling itself; how many antennas/RF chains the UE has (a UE with more
+    chains could measure more than one HAPS per hour, changing this budget entirely);
+    and cross-interference effects once many UEs are polling and switching at once (this
+    class runs each user independently with no multi-UE coupling). It also doesn't
+    capture the DQN's own structural advantage here: the DQN is software running in a
+    control-plane entity, not on the UE, so unlike this UE-side heuristic it isn't
+    bounded by any single UE's measurement/antenna/battery budget and can scale to
+    however many UEs the deployment has without each one needing to poll anything itself.
+    """
+
+    def __init__(self, n_haps=3):
+        self.n_haps = n_haps
+        self._last = None
+
+    def __call__(self, env, s):
+        if self._last is None:
+            self._last = env._sinr_db.copy()  # hour 0: no history yet, bootstrap with a full read
+        else:
+            poll_idx = env.t % self.n_haps
+            self._last[:, poll_idx] = env._sinr_db[:, poll_idx]
+        return np.argmax(self._last, axis=1)
 
 
 def greedy_throughput_policy(env, s):
@@ -98,7 +145,7 @@ def evaluate_method(eval_eps, policy_name, make_policy, agent=None):
     rows = []
     for _ in range(len(eval_eps)):
         policy = make_policy(agent)
-        m = run_episode(env, policy)
+        m = run_episode(env, policy, agent=agent)
         m.update({"method": policy_name, "episode_id": env.episode_id, "regime": env.regime})
         rows.append(m)
     return rows
@@ -123,9 +170,17 @@ def main() -> None:
         s = env.reset()
         for _ in range(MAX_STEPS):
             actions = agent.act_batch(s)
-            s2, r, done, _ = env.step(actions)
+            feeder_ctx = s.mean(axis=0)
+            feeder_raw = agent.act(feeder_ctx)
+            feeder_choice = feeder_raw % env.n_haps
+            s2, r, done, _ = env.step(actions, feeder_choice=feeder_choice)
+            feeder_ctx2 = s2.mean(axis=0)
             for k in range(env.n_users):
                 agent.remember(s[k], actions[k], r[k], s2[k], done)
+            # Same shared network/buffer learns the per-UAV feeder choice too, off the
+            # step-level (mean) reward, since it's one decision shared by all relay users
+            # that hour, not a per-user one.
+            agent.remember(feeder_ctx, feeder_raw, float(r.mean()), feeder_ctx2, done)
             agent.train_step()
             s = s2
         agent.decay_eps()
@@ -151,6 +206,7 @@ def main() -> None:
     all_rows += evaluate_method(eval_eps, "dqn", dqn_policy, agent)
     agent.eps = saved_eps
     all_rows += evaluate_method(eval_eps, "max_sinr", lambda a: max_sinr_policy)
+    all_rows += evaluate_method(eval_eps, "bounded_poll_sinr", lambda a: BoundedPollMaxSINR())
     all_rows += evaluate_method(eval_eps, "random", lambda a: random_policy)
     results = pd.DataFrame(all_rows)
     results.to_csv(os.path.join(OUT_DIR, "eval_episodes.csv"), index=False, float_format="%.4f")

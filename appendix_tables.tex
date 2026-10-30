@@ -59,9 +59,12 @@ The following tables present comprehensive multi-distance and multi-frequency pa
 Table~\ref{table:app-uav-relay-comparison} gives the full numeric backing for
 the UAV relay path introduced in \S\ref{sec:relay-path-analysis} and modeled
 by \texttt{uav\_relay\_two\_hop\_capacity\_bps\_hz()}: a 38\,GHz
-HAPS\,$\rightarrow$\,UAV first hop (the feeder link; slant path, UAV hovering at
-500\,m, with ITU-P.618 scintillation) combined decode-and-forward with a
-2\,GHz, landscape-dependent UAV\,$\rightarrow$\,UE second hop. Suburban and
+HAPS\,$\rightarrow$\,UAV first hop (the feeder link; slant path, UAV static at
+500\,m altitude and fixed 0.1\,km from the serving HAPS's own nadir along the
+good-sector azimuth of Fig.~\ref{fig:app-constellation-sectors}, with ITU-P.618
+scintillation) combined decode-and-forward with a
+2\,GHz, landscape-dependent UAV\,$\rightarrow$\,UE second hop, whose distance is
+each user's real, growing distance from that one fixed point. Suburban and
 high-rise are shown (best/worst case for the landscape-dependent second hop);
 all four landscapes are in \texttt{appendix\_data/UAV\_relay\_path\_comparison.csv}.
 

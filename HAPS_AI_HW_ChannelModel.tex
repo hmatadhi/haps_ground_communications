@@ -71,7 +71,7 @@ ITU-R atmospheric losses (rain, fog, gas, scintillation) for backhaul-
 and feeder-link design. The channel model is realised in Python (NumPy +
 Matplotlib + itur package) and characterised through signal-
 quality curves, spatial-heterogeneity analysis, and atmospheric
-sensitivity results. An LSTM forecasts 38\,GHz feeder rain attenuation up to six hours ahead; on held-out 2026 data it is more accurate than persistence only at four to six hours (RMSE), and the DQN uses all six forecast horizons. A DQN agent using this forecast earns higher reward than a max-throughput rule over the same six actions, and than max-SINR, across five experiments, with zero outage and fairness not significantly different from the max-throughput rule.
+sensitivity results. An LSTM forecasts 38\,GHz feeder rain attenuation up to six hours ahead; on held-out 2026 data it is more accurate than persistence from two to six hours (RMSE), and the DQN uses all six forecast horizons. A DQN agent using this forecast earns higher reward than a max-throughput rule over the same six actions, and than max-SINR, across five experiments, with zero outage and fairness not significantly different from the max-throughput rule.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -140,7 +140,7 @@ In this document, we (i) characterise the channel: free-space and LoS-probabilit
 \hline
 HAPS & 20\,km & 3 & Equilateral 65km, 1 Server, 2 Interferer \\
 \hline
-UAV Relay & 500\,m AGL & 1 & Static (no mobility) \\
+UAV Relay & 500\,m AGL & 1 & Static, fixed 0.1\,km from serving HAPS nadir (good sector) \\
 \hline
 Gateway & 50\,m AGL & 1 & Centroid of HAPS triangle \\
 \hline
@@ -151,7 +151,7 @@ Users & 1.5\,m (hand-held) & $N$ (configurable) & Uniform random in coverage \\
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.9\linewidth]{./figures/network_diagram.pdf}
+\includegraphics[width=0.9\linewidth]{./figures/network_diagram_gw.pdf}
 \caption{Topology}
 \label{fig:simulation-topology}
 \end{figure}
@@ -161,11 +161,11 @@ Users & 1.5\,m (hand-held) & $N$ (configurable) & Uniform random in coverage \\
 Backhaul links operate in the 38.0–39.5 GHz millimeter-wave band allocated to HAPS at WRC-19 (Ka-band)~\cite{wrc19}.
 The backhaul link is a short-range connection from the HAPS aircraft to the ground-based Gateway.
 \begin{itemize}
-  \item Gateway Altitude: 50 m AGL
+  \item Gateway Altitude: 50 m AGL, fixed at the HAPS triangle's centroid rather than co-located under the serving HAPS (\S\ref{sec:relay-path-analysis})
   \item Altitude difference: $20\,\mathrm{km} - 0.05\,\mathrm{km} = 19.95\,\mathrm{km}$
-  \item Horizontal distance: $50\,\mathrm{m}$ from HAPS nadir.
-  \item Elevation angle: $\theta = \arctan\left(\frac{19.95}{0.05}\right) \approx 89.86^\circ$ (near zenith)
-  \item Slant path: $L_{\text{slant}} = \sqrt{19.95^2 + 0.05^2} \approx 19.95\,\mathrm{km}$
+  \item Horizontal distance: $37.5278\,\mathrm{km}$ from the serving HAPS nadir (circumradius of the 65\,km equilateral triangle, $65/\sqrt{3}$; equidistant from all three HAPS)
+  \item Elevation angle: $\theta = \arctan\left(\frac{19.95}{37.5278}\right) \approx 27.995^\circ$ (far from zenith)
+  \item Slant path: $L_{\text{slant}} = \sqrt{37.5278^2 + 19.95^2} \approx 42.50\,\mathrm{km}$
   \item HAPS transmit power: $P_h = 43$\,dBm; HAPS-side transmit antenna gain: $G_h = 13.8$\,dBi (directional Ka-band aperture toward the Gateway, per the 30\,GHz-class HAPS link budget of Karaman et al.~\cite{karaman2025haps})
   \item Gateway receive antenna gain: $G_g = 39.7$\,dBi (fixed VSAT-class terminal, larger aperture feasible at a ground installation~\cite{karaman2025haps})
   \item Combined link EIRP + receive gain: $P_h + G_h + G_g \approx 96.5$\,dBm-equivalent, before FSPL and atmospheric losses (\S III.B)
@@ -174,14 +174,14 @@ The backhaul link is a short-range connection from the HAPS aircraft to the grou
 \subsection{Relay Link Geometry}
 
 The relay link (HAPS-to-UAV 38.0–39.5 GHz and UAV-to-User, f = 2.1 -- 2.2 GHz~\cite{wrc19,3gpp_ts38101_5}) connects HAPS to ground users via the UAV relay node positioned at
-500 m AGL (Table~\ref{tab:config}).
+500 m AGL, fixed at a short 0.1\,km horizontal offset from the serving HAPS's own nadir (not the triangle centroid, which the Gateway now occupies; \S\ref{sec:relay-path-analysis}), along the good-sector azimuth of Fig.~\ref{fig:app-constellation-sectors} -- the direction away from the midpoint of the two interfering HAPS (Table~\ref{tab:config}).
 \subsubsection{HAPS-to-UAV leg (Feeder Link, 38 GHz)}
 \begin{itemize}
   \item UAV Relay Altitude: 500 m AGL
   \item Altitude difference: $20\,\mathrm{km} - 0.5\,\mathrm{km} = 19.5\,\mathrm{km}$
-  \item Horizontal distance: $500\,\mathrm{m}$ from HAPS nadir.
-  \item Elevation angle: $\theta = \arctan\left(\frac{19.5}{0.5}\right) \approx 88.5^\circ$ (near zenith)
-  \item Slant path: $L_{\text{slant}} = \sqrt{19.5^2 + 0.5^2} \approx 19.51\,\mathrm{km}$
+  \item Horizontal distance: $100\,\mathrm{m}$ from the serving HAPS's own nadir (good-sector azimuth).
+  \item Elevation angle: $\theta = \arctan\left(\frac{19.5}{0.1}\right) \approx 89.71^\circ$ (near zenith)
+  \item Slant path: $L_{\text{slant}} = \sqrt{0.1^2 + 19.5^2} \approx 19.50\,\mathrm{km}$
   \item HAPS transmit power: $P_h = 43$\,dBm; HAPS-side transmit antenna gain: $G_h = 13.8$\,dBi (same directional Ka-band aperture as the backhaul link, \S\ref{subsec:backhaul-geometry})
   \item UAV receive antenna gain: $G_u = 30.7$\,dBi (UAV-mountable 32$\times$32-element mmWave patch array, conservative low end of the 30.7--32.8\,dBi range reported at 25.4--26.9\,GHz~\cite{anim2021uav}, applied here at 38\,GHz)
 \end{itemize}
@@ -190,9 +190,9 @@ The relay link (HAPS-to-UAV 38.0–39.5 GHz and UAV-to-User, f = 2.1 -- 2.2 GHz~
 \begin{itemize}
   \item User Altitude: 1.5 m (hand-held)
   \item Altitude difference: $0.5\,\mathrm{km} - 0.0015\,\mathrm{km} = 0.4985\,\mathrm{km}$
-  \item Horizontal distance: $500\,\mathrm{m}$ to $100\,\mathrm{km}$ from UAV.
-  \item Elevation angle: For 500m horizontal distance from UAV, $\theta = \arctan\left(\frac{0.4985}{0.5}\right) \approx 44.9^\circ$, for larger distances, the angle becomes much smaller.
-  \item Slant path: $L_{\text{slant}} = \sqrt{0.4985^2 + 0.5^2} \approx 0.707\,\mathrm{km}$
+  \item Horizontal distance: $0$ to $\sim\!100\,\mathrm{km}$ from the UAV's fixed point, since the UAV now sits near the serving HAPS's own nadir while served users range across the full service radius (unlike an earlier model in which the UAV was assumed to hover within a small, fixed offset of whichever user it served).
+  \item Elevation angle: For a user 500\,m from the UAV, $\theta = \arctan\left(\frac{0.4985}{0.5}\right) \approx 44.9^\circ$; for a user near the service-radius edge ($\sim$100\,km from the UAV), $\theta\approx0.3^\circ$.
+  \item Slant path: for the 500\,m example above, $L_{\text{slant}} = \sqrt{0.4985^2 + 0.5^2} \approx 0.707\,\mathrm{km}$; it grows to $\sim$100\,km at the service-radius edge.
   \item UAV transmit power: $P_u = 24$\,dBm; no directional antenna gain is modeled on this leg (UAV-side and UE-side antennas are treated as isotropic, consistent with the service link).
 \end{itemize}
 
@@ -257,7 +257,7 @@ A_\mathrm{rain} = \gamma_R \; L_\mathrm{eff} \quad [\mathrm{dB}],
 
 \subsubsection{Total Rain Attenuation~\cite{itu_p618}}
 The effective path length $L_\mathrm{eff}$ follows ITU-R P.618~\cite{itu_p618} (slant-path reduction factors and
-site-dependent scaling for non-uniform rain along the path). The specific attenuation above is reported directly: for the 38\,GHz, $11.3^\circ$ worst-case backhaul path (102\,km slant), $\gamma_R\approx3.0$\,dB/km at 10\,mm/h and $\approx6.8$\,dB/km at 25\,mm/h. Multiplying by $L_\mathrm{eff}$ gives the path attenuation for a given rain rate. For the gateway geometry (89.86\,$^\circ$, 5.2\,km of rain), the path attenuation at a given rate is $\gamma_R L_s r$, where $L_s$ is the slant length through the rain layer and $r$ is the P.618 reduction factor. For Delhi, the ITU-R P.837 rain rate exceeded 0.1\,\% of the time is $R_{0.1}=15.7$\,mm/h, which gives $\approx19$\,dB of rain loss on the gateway path. The clear-sky gateway SNR is about 46\,dB, so after rain at 0.1\,\% about 27\,dB remains. The gaseous loss on the gateway path is $\approx0.4$\,dB (ITU-R P.676, $\rho=10$\,g/m$^3$), leaving about 26\,dB. The 38\,GHz gateway link therefore closes at 99.9\,\% availability. The 0.01\,\% rate ($R_{0.01}=61.8$\,mm/h) would give $\approx56$\,dB and is not the design target.
+site-dependent scaling for non-uniform rain along the path). The specific attenuation above is reported directly: for the 38\,GHz, $11.3^\circ$ worst-case backhaul path (102\,km slant), $\gamma_R\approx3.0$\,dB/km at 10\,mm/h and $\approx6.8$\,dB/km at 25\,mm/h. Multiplying by $L_\mathrm{eff}$ gives the path attenuation for a given rain rate. For the gateway geometry (the Gateway is fixed at the HAPS triangle's centroid, $27.995\,^\circ$ elevation, $k\approx0.398$, $\alpha\approx0.879$ at 38\,GHz; 5.28\,km of rain), the path attenuation at a given rate is $\gamma_R L_s r$, where $L_s$ is the slant length through the rain layer and $r$ is the P.618 reduction factor. For Delhi, the ITU-R P.837 rain rate exceeded 0.1\,\% of the time is $R_{0.1}=15.7$\,mm/h, which gives $\approx8.6$\,dB of rain loss on the gateway path (\texttt{feeder\_link\_rain\_effect\_on\_capacity()}). The clear-sky gateway SNR (FSPL at the 42.50\,km slant range plus the $G_h+G_g=53.5$\,dBi combined antenna gain) is about 39.9\,dB, so after rain at 0.1\,\% about 31.3\,dB remains. The gaseous loss on the gateway path is $\approx0.4$\,dB (ITU-R P.676, $\rho=10$\,g/m$^3$), leaving about 30.9\,dB. The 38\,GHz gateway link therefore closes comfortably at 99.9\,\% availability. The 0.01\,\% rate ($R_{0.01}=61.8$\,mm/h) gives $\approx16.5$\,dB of rain loss, leaving about 23.0\,dB after gas loss -- the shallower, longer-horizontal-extent slant path through the rain layer is de-rated more strongly by the P.618 reduction factor than the old near-nadir path was, so (unlike the previous near-nadir Gateway geometry, where a 56\,dB loss at this rain rate exceeded the entire clear-sky budget and failed to close) the link now closes even at the 99.99\,\% availability target, though 99.9\,\% remains the one reported here.
 
 \subsubsection{Fog/Cloud Attenuation~\cite{itu_p840}}
 Fog attenuation depends on the liquid-water density $M$ [g/m$^3$], frequency
@@ -483,14 +483,14 @@ gateway dish) and $D=1$\,m for the 2.1\,GHz link (a stated reference aperture). 
 Elevation & $p=0.01$\,\% & $p=1$\,\% & $p=0.01$\,\% & $p=1$\,\% \\
 \midrule
 $10^\circ$ & 1.76\,dB & 0.73\,dB & 0.33\,dB & 0.14\,dB \\
-$30^\circ$ & 0.49\,dB & 0.21\,dB & 0.09\,dB & 0.04\,dB \\
+$27.995^\circ$ (Gateway feeder) & 0.55\,dB & 0.23\,dB & 0.10\,dB & 0.04\,dB \\
 $60^\circ$ & 0.25\,dB & 0.11\,dB & 0.05\,dB & 0.02\,dB \\
-$89.86^\circ$ & 0.21\,dB & 0.09\,dB & 0.04\,dB & 0.02\,dB \\
+$89.71^\circ$ (UAV feeder) & 0.21\,dB & 0.09\,dB & 0.04\,dB & 0.02\,dB \\
 \bottomrule
 \end{tabular}}
 \end{center}
 
-The fade at $30^\circ$ is about 0.5\,dB at 38\,GHz and about 0.09\,dB at 2.1\,GHz for $p=0.01$\,\%. The fade grows with frequency and
+The fade at the Gateway's feeder elevation ($\approx28^\circ$) is about 0.55\,dB at 38\,GHz and about 0.10\,dB at 2.1\,GHz for $p=0.01$\,\%. The fade grows with frequency and
 with decreasing elevation, as the P.618 method predicts. The earlier empirical fit, with an exponent of 0.7 that was not
 validated by measurement, is no longer used.
 
@@ -504,7 +504,7 @@ validated by measurement, is no longer used.
 \includegraphics[width=0.95\textwidth]{./figures/9b_scintillation_fade_vs_elev.png}
 \caption*{(b) vs.\ elevation}
 \end{subfigure}
-\caption{Scintillation fade depth characteristics (ITU-R P.618, \texttt{itur}, gateway geometry at 38\,GHz with $D=0.31$\,m and 2.1\,GHz with $D=1$\,m): \textbf{(a)} Fade depth vs.\ time percentage at five elevation angles ($10\circ$--$60\circ$). \textbf{(b)} Fade depth vs.\ elevation angle at four time percentages ($0.01\%$--$10\%$).}
+\caption{Scintillation fade depth characteristics (ITU-R P.618, \texttt{itur}, feeder-link geometry at 38\,GHz with $D=0.31$\,m and 2.1\,GHz with $D=1$\,m): \textbf{(a)} Fade depth vs.\ time percentage at five elevation angles ($10\circ$--$60\circ$). \textbf{(b)} Fade depth vs.\ elevation angle at four time percentages ($0.01\%$--$10\%$).}
 \label{fig:scint_fade_depth}
 \end{figure}
 
@@ -606,9 +606,12 @@ corresponding elevation angle on the secondary top axis, using the
 2\,km effective rain-layer-height convention of
 Eq.~\eqref{eq:rain_loss}. At 100\,km ($11.3^\circ$) it gives
 $\approx$30\,dB at 10\,mm/h, matching the worst-case backhaul figure
-above. (The near-nadir gateway-path result of $\approx$19\,dB uses a
-different, site-specific 5.2\,km rain-layer depth and is not directly
-comparable to this curve's near-nadir end.) Attenuation grows faster
+above. (The Gateway's actual path result at its centroid geometry,
+$27.995^\circ$ elevation, is $\approx$6.9\,dB at 10\,mm/h -- it uses a
+different, site-specific 5.28\,km rain-layer depth and a much longer
+horizontal extent through the rain layer, which the P.618 reduction
+factor de-rates more strongly, so it is not directly comparable to this
+curve's low-elevation end.) Attenuation grows faster
 than linear past $\approx$100\,km as elevation drops and the rain
 slant-path lengthens.}
 \label{fig:rain-vs-distance}
@@ -715,7 +718,7 @@ The backhaul-link SINR is therefore
 
 where $N\_g$ is the gateway receiver noise power.
 
-The summation term represents potential multi-HAPS interference. It should not be interpreted as necessarily significant for every backhaul-link geometry. In the present constellation, the gateway is located close to the nadir of its serving HAPS, whereas the other HAPS are approximately 65~km away from the serving HAPS. Consequently, their 38~GHz signals experience substantially greater propagation loss than the desired backhaul signal. Under the present power, antenna, and geometry assumptions, this interference is expected to be negligible compared with the receiver noise, resulting in a predominantly noise-limited backhaul link.
+The summation term represents potential multi-HAPS interference. It should not be interpreted as necessarily significant for every backhaul-link geometry. In the present constellation, the gateway is fixed at the HAPS triangle's centroid, so it is in fact \emph{equidistant} from the serving HAPS and both interfering HAPS (all three at the same $\approx$42.50\,km slant range) -- unlike an earlier near-nadir gateway placement, where the interferers were much farther away than the serving HAPS. Despite this, the interference remains negligible for a different reason: each interferer's main beam points at its own service area rather than at the centroid (an off-boresight angle of $\approx62^\circ$ from that interferer's nadir), and the gateway's own receive dish points at the serving HAPS, so each interferer is seen $\approx100^\circ$ off the gateway's boresight. Both antenna patterns fall to the ITU-R F.699 sidelobe floor ($-10$\,dBi) in this direction, so the resulting interference power ($\approx-131$\,dBm) stays about 31\,dB below the thermal noise floor despite the equal slant ranges. Under the present power, antenna, and geometry assumptions, this interference is therefore still expected to be negligible compared with the receiver noise, resulting in a predominantly noise-limited backhaul link.
 
 Thus, multi-HAPS interference is \emph{modeled as a potential impairment} on the backhaul link, but the present configuration produces a negligible interference contribution. This distinction is important because backhaul-link interference can become relevant in a different frequency-reuse pattern, antenna pattern, gateway placement, or constellation geometry.
 
@@ -821,37 +824,72 @@ document targets
 $\gamma_{\text{min,design}}^{\text{haps-uav}}\approx+8$\,dB for the
 HAPS\,$\rightarrow$\,UAV hop.
 
-The relay path is swept over the HAPS\textendash UAV horizontal distance
-0--100\,km across all four landscapes, and Figure~\ref{fig:uav-relay-comparison}
+The UAV relay is now a fixed point, 0.1\,km from the serving HAPS's own nadir
+(\S\ref{subsec:backhaul-geometry}--\ref{sec:relay-path-analysis} above), rather than a platform that hovers
+above whichever user it serves. The sweep variable is therefore the \emph{user's} horizontal
+distance from the serving HAPS (0--100\,km, across all four landscapes): the feeder hop
+(HAPS\,$\rightarrow$\,UAV) stays at the UAV's fixed, near-zenith geometry regardless of this
+distance, while the access hop (UAV\,$\rightarrow$\,UE) uses the user's real, growing distance
+from that one fixed point. Figure~\ref{fig:uav-relay-comparison}
 plots the resulting SINR on each hop against the direct HAPS\,$\rightarrow$\,UE link.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{./figures/12_uav_relay_comparison.png}
-\caption{Direct HAPS\,$\rightarrow$\,UE SINR (suburban, averaged in dB over 24 azimuths, including co-channel interference from the other two HAPS) vs.\ the two UAV relay hops, as a function of HAPS\textendash UAV horizontal distance. The HAPS\,$\rightarrow$\,UAV feeder hop (orange, including interference from the other HAPS, which is about 35\,dB below the noise floor) starts at $+37.6$\,dB at nadir and stays above $+22$\,dB at 100\,km, well above the $+8$\,dB design floor (Eq.~\eqref{eq:sinr-min-design}). The UAV\,$\rightarrow$\,UE access hop (green, suburban and high-rise identical at 500\,m) is $+33.4$\,dB. The direct link falls from $+7.3$\,dB at nadir to $-9.1$\,dB at 100\,km.}
+\caption{Direct HAPS\,$\rightarrow$\,UE SINR (suburban, averaged in dB over 24 azimuths, including co-channel interference from the other two HAPS) vs.\ the two UAV relay hops, as a function of the user's horizontal distance from the serving HAPS (and, since the UAV sits only 0.1\,km from that HAPS's own nadir, approximately from the UAV as well). The HAPS\,$\rightarrow$\,UAV feeder hop (orange, including interference from the other HAPS, which is about 35\,dB below the noise floor) is now a constant $+37.6$\,dB, since the UAV's own position does not change with user distance -- well above the $+8$\,dB design floor (Eq.~\eqref{eq:sinr-min-design}). The UAV\,$\rightarrow$\,UE access hop (green) instead collapses with the user's real distance from the fixed UAV: $+33.3$\,dB at 0\,km (user effectively at the UAV) falling to $-37.7$\,dB at 100\,km. The direct link falls from $+7.3$\,dB at 0\,km to $-4.3$\,dB at 100\,km.}
 \label{fig:uav-relay-comparison}
 \end{figure}
 
-\noindent\textbf{The relay outperforms the direct link at every distance,
-because co-channel interference from the other HAPS limits the direct service link.}
-The UAV hovers directly above the user it serves (\S II), so its horizontal distance
-from the user is small and fixed, while its distance from the serving HAPS grows with
-the user's own distance from the HAPS nadir. The UAV\,$\rightarrow$\,UE hop therefore stays
-at $\mathrm{SINR}\approx+33$\,dB regardless of where the UAV is deployed.
-The HAPS\,$\rightarrow$\,UAV hop is a 38\,GHz
-slant path with antenna gains $G_h=13.8$\,dBi (HAPS side) and $G_u=30.7$\,dBi (UAV side),
-matching a published 30\,GHz HAPS backhaul-class budget and a UAV-mountable mmWave
-patch-array antenna~\cite{karaman2025haps,anim2021uav}. Its SINR is $+37.6$\,dB at nadir and
-falls to $+22.6$\,dB at 100\,km as the elevation angle drops to $11^\circ$. Its interference
-term is about 35\,dB below the noise floor, so the hop is noise-limited. The direct
-HAPS\,$\rightarrow$\,UE link is different: it shares the 2\,GHz band with the other two HAPS, and its
-SINR falls from $+7.3$\,dB at nadir to $-9.1$\,dB at 100\,km. Its capacity therefore drops from
-$2.7$ to $0.2$\,bits/s/Hz. The relay's end-to-end capacity is $C_{\text{uav-relay}} = \min(C_{\text{haps-uav}}, C_{\text{uav-ue}})$:
-$11.1$\,bits/s/Hz at nadir, where the UAV\,$\rightarrow$\,UE access hop is the bottleneck, and $7.5$\,bits/s/Hz at 100\,km,
-where the feeder hop is the bottleneck (from about 30\,km outward). This result depends on two
-modelling choices: the 38\,GHz scintillation fade from the ITU-R P.618 table
-(about 0.2\,dB at zenith), and the ITU-R F.699 sidelobe envelope used for the interferers and the
-receive patterns (Section~III, interference model). The DQN association agent (\S\ref{sec:lstm-dqn-motivation}) can route traffic through the UAV relay, as one of its six actions.
+\noindent\textbf{A single relay UAV serves only a small disk around its fixed position near
+the serving HAPS's nadir. Beyond that disk there is no relay available, not a relay that
+loses -- the motivation for the fleet-sizing argument below.} Figure~\ref{fig:uav-relay-comparison}
+and the paragraph that follows compare direct and relay capacity only within that disk,
+where a single static UAV is actually a candidate; the 0--100\,km sweep is retained only to
+show \emph{where} the disk's edge falls, not as a comparison of the full 100\,km-radius
+service link against one relay node's narrow access footprint.
+The UAV is fixed 0.1\,km from the serving HAPS's own nadir (\S\ref{sec:relay-path-analysis}
+above), so the feeder hop (HAPS\,$\rightarrow$\,UAV) stays at a constant, near-zenith
+$89.71^\circ$ elevation and $\mathrm{SINR}\approx+37.6$\,dB (12.48\,bits/s/Hz) for every user,
+with antenna gains $G_h=13.8$\,dBi (HAPS side) and $G_u=30.7$\,dBi (UAV side), matching a
+published 30\,GHz HAPS backhaul-class budget and a UAV-mountable mmWave patch-array antenna
+~\cite{karaman2025haps,anim2021uav}; its interference term is about 35\,dB below the noise
+floor, so the hop is noise-limited. The UAV\,$\rightarrow$\,UE access hop depends on each
+user's real distance from that fixed point: its SINR falls from $+33.3$\,dB
+(11.05\,bits/s/Hz) for a user right at the UAV to $-3.3$\,dB (0.56\,bits/s/Hz, suburban) by
+10\,km and $-37.7$\,dB ($\approx$0\,bits/s/Hz) by 100\,km. The direct
+HAPS\,$\rightarrow$\,UE link, which shares the 2\,GHz band with the other two HAPS, degrades
+far more slowly: its SINR falls from $+7.3$\,dB at 0\,km to $-4.3$\,dB at 100\,km, and its
+capacity from $2.67$ to $0.46$\,bits/s/Hz. The relay's end-to-end, decode-and-forward
+capacity $C_{\text{uav-relay}}=\min(C_{\text{haps-uav}}, C_{\text{uav-ue}})$ is therefore
+bottlenecked by the access hop at every distance beyond the UAV's immediate vicinity: it
+starts at $11.05$\,bits/s/Hz at 0\,km (still above the direct link's $2.67$), but crosses
+below the direct link's capacity by about $5$--$6$\,km in suburban terrain and by about
+$1$--$2$\,km in high-rise terrain, falling to $0.56$\,bits/s/Hz by 10\,km and effectively
+$0$ beyond 20\,km -- a small bubble of relay advantage around the UAV's fixed position,
+not an advantage at every distance. This is a direct consequence of moving the UAV from a
+user-tracking placement to a fixed point near the serving HAPS's nadir: the feeder hop
+improved (constant $+37.6$\,dB instead of degrading with distance), but the access hop,
+which used to track the user, now degrades just as the direct link's service-area falloff
+does, and does so much faster because the UAV's 500\,m altitude loses elevation -- and LoS
+probability -- far sooner than the HAPS's 20\,km altitude does. The DQN association agent
+(\S\ref{sec:lstm-dqn-motivation}) can still route traffic through the UAV relay, as one of
+its six actions, but under this geometry it is a narrow, near-HAPS-nadir option rather than
+a uniformly-better alternative to the direct link.
+
+\paragraph{Fleet sizing: why one UAV is not enough.} Table~1 fixes the relay UAV count at
+one, which is sufficient to validate the two-hop capacity model but not to cover the
+service link's 100\,km radius -- Figure~\ref{fig:uav-relay-comparison} shows a single UAV's
+useful radius is only a few kilometres wide. \texttt{generate\_uav\_placement\_study.py}
+makes this concrete with an idealized covering-number estimate (no cross-UAV interference,
+mobility, or selection policy -- a sizing bound, not a deployable design): sweeping one
+UAV's distance from the user it serves (urban terrain) against a $0.5$\,bits/s/Hz usable
+floor gives an effective single-UAV coverage radius $R_{\text{eff}}\approx6.5$\,km.
+Tiling the full 100\,km-radius service area with non-overlapping $R_{\text{eff}}$-radius
+disks, in rings spaced $2R_{\text{eff}}$ apart, requires 8 rings and
+$\approx$205 UAVs in total. A single static relay UAV is therefore a proof of concept for
+the two-hop model, not a coverage solution; covering the service area as this geometry
+requires needs a UAV fleet on this order, with a placement/assignment policy across them
+-- left as future work (\S\ref{sec:conclusion}).
 
 \subsubsection{HAPS-to-UE Service Link}
 
@@ -959,7 +997,7 @@ as shown in Figure~\ref{fig:app-constellation-sectors}.
 
 So multi-HAPS interference makes the service area spatially non-uniform even at fixed radial distance $r$.
 
-The same interference term exists in the general SINR formula for the 38 GHz backhaul link, but under the current geometry (gateway near serving-HAPS nadir, interferers ~65 km away) that interference is expected to be negligible vs. receiver noise.
+The same interference term exists in the general SINR formula for the 38 GHz backhaul link, but under the current geometry (gateway fixed at the triangle's centroid, equidistant at $\approx$42.50\,km slant range from the serving HAPS \emph{and} both interferers) that interference is still expected to be negligible vs. receiver noise -- not because the interferers are farther away, but because both the interferers' transmit beams and the gateway's own receive beam point away from each other (\S\ref{subsec:multinode-sinr}), putting the interference path on the ITU-R F.699 sidelobe floor on both ends.
 Bottom line: the service-link analysis is scoped to the angularly-varying interference pattern (good/bad sectors, SINR spread), while the backhaul link is reported as predominantly noise-limited under this constellation/gateway placement.
 
 
@@ -989,7 +1027,7 @@ Figure~\ref{fig:sinr-service-link} decomposes this along one representative dire
 \label{fig:sinr-service-link}
 \end{figure}
 
-Figure~\ref{fig:sinr-feeder-link} shows the 38~GHz backhaul-link SINR for gateway offsets of 10--500~m from nadir (gateway at 50\,m altitude, HAPS at nominal stratospheric altitude), including the HAPS-side and Gateway-side antenna gains of \S\ref{subsec:backhaul-geometry} ($G_h=13.8$\,dBi, $G_g=39.7$\,dBi). The backhaul slant range is set by the HAPS altitude ($\sim$20\,km), against which a 10--500\,m horizontal offset is negligible, so SINR is essentially flat at $\approx+38.0$--$38.1$\,dB across this range -- strongly positive once the directional antenna gains are included, versus the deeply negative result obtained when the link budget used raw transmit power alone (\S\ref{subsec:backhaul-geometry}). The interfering HAPS, by contrast, sit at a slant range of $\sim$65--68\,km (equilateral-triangle geometry, \S III.A); the resulting interference power is $\approx-35$\,dB below the noise floor. This assumes that each interferer's main beam points at its own service area, so the gateway sees it through the sidelobe envelope of ITU-R F.699 (floored at $-10$\,dBi), and that the gateway dish is off-boresight by about $73^\circ$ toward the interferer, so its gain there is also the $-10$\,dBi floor. The backhaul link is therefore \textbf{noise-limited, not interference-limited}, unlike the service link.
+Figure~\ref{fig:sinr-feeder-link} shows the 38~GHz feeder-link SINR for near-nadir offsets of 10--500~m from the serving HAPS's own nadir. Under the current design this near-nadir regime belongs to the UAV relay (500\,m altitude, fixed at a 0.1\,km offset within this swept range; \S\ref{subsec:backhaul-geometry}--\ref{sec:relay-path-analysis}), not the Gateway, which is now fixed at the triangle's centroid, 42.50\,km away (\S\ref{subsec:backhaul-geometry}); the HAPS-side and UAV-side antenna gains used are $G_h=13.8$\,dBi, $G_u=30.7$\,dBi. The feeder slant range is set by the HAPS altitude ($\sim$20\,km), against which a 10--500\,m horizontal offset is negligible, so SINR is essentially flat at $\approx+37.6$\,dB across this range -- strongly positive once the directional antenna gains are included, versus the deeply negative result obtained when the link budget used raw transmit power alone (\S\ref{subsec:backhaul-geometry}). The interfering HAPS, by contrast, sit at a slant range of $\sim$65--68\,km from this near-nadir point (equilateral-triangle geometry, \S III.A); the resulting interference power is $\approx-35$\,dB below the noise floor. This assumes that each interferer's main beam points at its own service area, so the UAV sees it through the sidelobe envelope of ITU-R F.699 (floored at $-10$\,dBi). The feeder hop is therefore \textbf{noise-limited, not interference-limited}, unlike the service link. (The Gateway's own backhaul hop, now at the triangle's centroid, is a separate, single operating point -- $27.995^\circ$ elevation, 42.50\,km slant, $\approx$39.7\,dB SINR -- analyzed in \S\ref{subsec:backhaul-geometry} and \S\ref{subsec:multinode-sinr}, not shown on this near-nadir sweep. \emph{Note: this figure's underlying data were generated before the Gateway/UAV geometry swap and have not been confirmed to be regenerated against the updated model; the qualitative near-nadir, noise-limited conclusion is expected to still hold for the UAV, per the hand check in this paragraph, but the plotted curve should be regenerated to be certain.})
 
 \begin{figure}[h!]\centering
 \includegraphics[width=0.95\columnwidth]{./figures/haps_feeder_link_38ghz.png}
@@ -1093,7 +1131,7 @@ This section combines two learned components for dynamic user-to-platform associ
 \paragraph{How it is used.} The pipeline has four steps:
 \begin{enumerate}
 \item \textbf{Data preparation.} Hourly NASA POWER and METAR observations and ERA5 cloud fields for Delhi (2023--2026) are merged on UTC hours. The 14 input features are temperature, humidity, pressure, wind, precipitation, cloud amount, visibility, rain and fog codes, cloud liquid water, and sine and cosine encodings of time of day and season.
-\item \textbf{Target.} For each hour, the target is the rain attenuation on the HAPS-to-gateway path at $38.0$\,GHz and $89.86^\circ$ elevation, from the observed precipitation: $\gamma_R$ from ITU-R P.838 at the hourly rate, multiplied by the slant length through the rain layer (P.839 rain height of $5.28$\,km at Delhi) and the P.618 path reduction factor. The same model gives the DQN's rain loss (Section~\ref{sec:dqn-results}).
+\item \textbf{Target.} For each hour, the target is the rain attenuation on the HAPS-to-Gateway path at $38.0$\,GHz and $27.995^\circ$ elevation (the Gateway is fixed at the HAPS triangle's centroid, 42.50\,km slant range from the serving HAPS -- see Section~\ref{sec:channel-model-summary}), from the observed precipitation: $\gamma_R$ from ITU-R P.838 at the hourly rate, multiplied by the slant length through the rain layer (P.839 rain height of $5.28$\,km at Delhi) and the P.618 path reduction factor. The same model gives the DQN's rain loss (Section~\ref{sec:dqn-results}).
 \item \textbf{Windows.} Each sample uses the past 24 hours of features and predicts the next six hourly targets.
 \item \textbf{Rolling episodes.} The DQN is trained on $400$ rolling 24-hour episodes drawn from 2024, each starting at a distinct hour. At every hour of an episode, the LSTM forecast from the preceding 24 hours is supplied as the state feature.
 \end{enumerate}
@@ -1109,23 +1147,27 @@ Forecasts are always out of sample. The 2024 forecasts come from a model trained
 \hline
 \textbf{Horizon} & \textbf{LSTM MAE} & \textbf{Persistence MAE} & \textbf{LSTM RMSE} & \textbf{Persistence RMSE} \\
 \hline
-$+1$\,h & $0.20$ & $\mathbf{0.12}$ & $0.65$ & $\mathbf{0.53}$ \\
+$+1$\,h & $0.15$ & $\mathbf{0.10}$ & $0.35$ & $\mathbf{0.34}$ \\
 \hline
-$+2$\,h & $0.27$ & $\mathbf{0.20}$ & $0.86$ & $\mathbf{0.75}$ \\
+$+2$\,h & $0.20$ & $\mathbf{0.18}$ & $\mathbf{0.47}$ & $0.50$ \\
 \hline
-$+3$\,h & $0.31$ & $\mathbf{0.26}$ & $0.96$ & $\mathbf{0.90}$ \\
+$+3$\,h & $0.23$ & $0.23$ & $\mathbf{0.54}$ & $0.62$ \\
 \hline
-$+4$\,h & $0.33$ & $\mathbf{0.30}$ & $\mathbf{1.00}$ & $1.02$ \\
+$+4$\,h & $\mathbf{0.26}$ & $0.27$ & $\mathbf{0.59}$ & $0.70$ \\
 \hline
-$+5$\,h & $0.34$ & $0.34$ & $\mathbf{1.00}$ & $1.11$ \\
+$+5$\,h & $\mathbf{0.27}$ & $0.30$ & $\mathbf{0.61}$ & $0.76$ \\
 \hline
-$+6$\,h & $\mathbf{0.35}$ & $0.36$ & $\mathbf{1.02}$ & $1.17$ \\
+$+6$\,h & $\mathbf{0.28}$ & $0.32$ & $\mathbf{0.64}$ & $0.80$ \\
 \hline
 \end{tabularx}}
 \end{table}
 
-\paragraph{Reading the validation.} Persistence is more accurate at $+1$ to $+3$\,h on both measures. At $+4$\,h the LSTM has the lower RMSE, and at $+5$ and $+6$\,h it matches or beats persistence on MAE and RMSE. The gain over persistence is therefore modest and confined to the longer horizons. In rain hours (1248 of the 6557 forecasts) the LSTM is less accurate than persistence at $+1$\,h (MAE $0.71$ against $0.51$\,dB). Each method forecasts every hour of 2026, and the errors are averaged per horizon over the year. Persistence serves as the benchmark only. The DQN uses all six forecast horizons at every hour. As a reference that uses no recent weather, the same-hour average for an hour is the mean attenuation over 2023--2025 for the same calendar month and hour of day.
+\paragraph{Reading the validation.} Persistence is more accurate at $+1$\,h on both measures. From $+2$\,h onward the LSTM has the lower RMSE, and from $+4$\,h onward it also has the lower MAE ($+3$\,h ties on MAE). The gain over persistence therefore appears earlier and is larger than under the near-nadir Gateway geometry, since persistence degrades faster than the LSTM as the horizon lengthens. In rain hours (1248 of the 6557 forecasts) the LSTM is less accurate than persistence at $+1$\,h (MAE $0.43$ against $0.36$\,dB). Each method forecasts every hour of 2026, and the errors are averaged per horizon over the year. Persistence serves as the benchmark only. The DQN uses all six forecast horizons at every hour. As a reference that uses no recent weather, the same-hour average for an hour is the mean attenuation over 2023--2025 for the same calendar month and hour of day.
 
+% TODO(static_gw): Table~\ref{tab:accuracy-2026}'s accuracy ratios and Diebold-Mariano
+% p-values were computed under the old near-nadir Gateway geometry (89.86 deg). No
+% script for this methodology exists in src/lstm/ to recompute them against the new
+% 27.995 deg centroid-Gateway LSTM labels -- flagged, not silently left as-is or guessed.
 \noindent\textbf{Accuracy.} Accuracy is defined per hour as $1-(A_\mathrm{actual}-A_\mathrm{forecast})/A_\mathrm{actual}$, the observed and predicted attenuation in dB, and is averaged over the 2026 hours in which the observed attenuation exceeds $1$\,dB (rainy hours). The raw average is reported, not clipped. A value of $1$ is a perfect forecast, values above $1$ mean the forecast was too low, and values below $1$ mean it was too high. Table~\ref{tab:accuracy-2026} gives the result for the LSTM forecast and for the same-hour average.
 
 \begin{table}[t]
@@ -1152,7 +1194,7 @@ $+6$\,h & $\mathbf{0.28}$ / $\mathbf{0.18}$ & $0.25$ / $0.21$ & $0.18$ & $0.88$ 
 \end{tabularx}}
 \end{table}
 
- A same-hour average forecast (the mean attenuation for the same month and hour over 2023--2025) has a MAE of $0.37$\,dB and an RMSE of $0.98$\,dB at every horizon. The LSTM has a lower MAE than same-hour average at all six horizons, and a lower RMSE only at $+1$ to $+3$\,h; at $+4$ to $+6$\,h its RMSE is slightly higher. Improving the forecast with current observations from neighbouring regions is future work.
+ A same-hour average forecast (the mean attenuation for the same month and hour over 2023--2025) has a MAE of $0.33$\,dB and an RMSE of $0.70$\,dB at every horizon. The LSTM has a lower MAE and a lower RMSE than the same-hour average at all six horizons (MAE $0.15$--$0.28$\,dB, RMSE $0.35$--$0.64$\,dB, against the same-hour average's constant $0.33$/$0.70$\,dB). Improving the forecast with current observations from neighbouring regions is future work.
 
 \begin{figure}[t]
 \centering
@@ -1314,7 +1356,7 @@ The multi-HAPS interference analysis (Figure~\ref{fig:multinode-interference}) i
 
 Independent of landscape, adding multi-HAPS co-channel interference degrades the 2~GHz service link by roughly 11--17\,dB relative to the noise-only case (comparing the noise-only SNR to the interference-degraded SINR, e.g.\ $18.5\to7.3$\,dB near nadir and $9.9\to-7.4$\,dB at 50\,km; Table A.2, Figure~\ref{fig:multinode-interference}).
 
-\noindent \textbf{Backhaul link (38 GHz) does NOT experience this penalty}: The three interfering HAPS are $\approx 65$ km from the ground Gateway, placing them far outside the 10--500 m backhaul coverage. Consequently, interference from constellation members remains well below thermal noise floor; backhaul SINR is primarily noise-limited and approximately constant at $+38$~dB, once the HAPS/Gateway directional antenna gains (\S\ref{subsec:backhaul-geometry}) are included in the link budget (Eq.~\eqref{eq:feeder-sinr},Figure~\ref{fig:sinr-feeder-link}).
+\noindent \textbf{Backhaul link (38 GHz) does NOT experience this penalty}: The Gateway is fixed at the HAPS triangle's centroid, so all three HAPS (the serving one and both interferers) are actually at the \emph{same} $\approx$42.50\,km slant range from it. Despite this, interference from the two interfering HAPS remains well below the thermal noise floor ($\approx$31\,dB below), because each interferer's transmit beam points at its own service area rather than at the centroid, and the Gateway's own receive dish points at the serving HAPS, so each interferer is seen through the ITU-R F.699 sidelobe floor on both ends ($-10$\,dBi); backhaul SINR is therefore primarily noise-limited, at $\approx$39.7\,dB once the HAPS/Gateway directional antenna gains (\S\ref{subsec:backhaul-geometry}) are included in the link budget (Eq.~\eqref{eq:feeder-sinr}). (The HAPS\,$\rightarrow$\,UAV feeder hop, now the near-nadir, fixed-offset link in this design, shows the same noise-limited behaviour at $\approx$37.6\,dB, Figure~\ref{fig:sinr-feeder-link}.)
 
 \paragraph{Scintillation fading (ITU P.618 implementation).}
 Figure~\ref{fig:scint_fade_depth} shows the ITU-R P.618 scintillation fade for the 38\,GHz gateway link and the 2.1\,GHz UE link. Over $p=0.01$--$10$\,\% and $10^\circ$--$90^\circ$ elevation, the fade is 0.04--1.8\,dB at 38\,GHz and 0.007--0.3\,dB at 2.1\,GHz. The 38\,GHz fade is about 0.2\,dB at zenith and 1.8\,dB at $10^\circ$ for $p=0.01$\,\%. These values replace the earlier empirical fit and its S-band (2.6--4.7\,dB) and Ka-band (7.6--13.1\,dB) fade values, which were not reproducible from P.618.
@@ -1443,8 +1485,12 @@ Battery SoC vs max-SINR (\%) & $+0.03$ & $[-0.06,\,+0.11]$ & $0.44$ & $4/5$ \\
 
 \paragraph{Limitation.} The DQN and the max-throughput rule share the same action set, so the gap between them isolates what the learned policy adds. The topology has a single ground gateway serving the network, and sharing of that gateway is not modelled. All weather data are for one site (Delhi, 28.61\,N, 77.21\,E), so the rain statistics and the forecast skill may not transfer to other climates.
 
+\paragraph{Forecast ablation.} Retraining for 2400 episodes across 10 seeds, with the six LSTM rain-forecast features present (\texttt{lstm}), removed (\texttt{none}), or replaced by the true future rain attenuation (\texttt{oracle}), gives statistically indistinguishable mean reward: $-14.54\pm1.79$, $-14.35\pm1.76$, and $-14.48\pm1.61$ per step. The forecast variant does not change performance. The association decision is made on the 2\,GHz service/access link, which ITU-R P.618 treats as rain-resilient (\S\ref{subsec:multinode-sinr}); the LSTM forecasts rain on the 38\,GHz feeder link instead (\S\ref{sec:lstm}). With one UAV per HAPS, the feeder link is never contended and its capacity stays far above the access-hop bottleneck (\S\ref{sec:relay-path-analysis}), so the feeder forecast carries no information relevant to this decision. The forecast matters once the feeder link itself becomes a decision variable, as described next.
+
 % =====================================================================
 \paragraph{Future work: spatio-temporal forecasting.} The forecaster uses only the target site's past weather, so its skill is limited to that site. A natural extension is a spatio-temporal graph model (for example DCRNN, T-GCN or Graph WaveNet): each region is a node, neighbouring regions are linked, an LSTM runs over time at each node, and the edge weights are learned to estimate how much each neighbour contributes to the target. This would draw on regions from the coast to the desert and from the Himalayas to the plains. It needs time series for every node, a check that the learned edges are physically plausible, and a comparison with the present LSTM, persistence and same-hour average on the same hours. Any change to the forecast would also require retraining the DQN.
+
+\paragraph{Future work: decoupled feeder/service MDPs under multi-UAV feeder contention.} The forecast-ablation result above is specific to a single UAV per HAPS, whose feeder link is never shared. Extending the fleet envisioned in \S\ref{sec:relay-path-analysis} (multiple UAVs tiling the service area, \S\ref{sec:conclusion}) would make the feeder hop a shared, capacity-limited resource: several UAVs under one HAPS competing for feeder airtime during a rain fade. Modelling this needs an explicit, per-UAV feeder-link MDP (which HAPS feeds a given UAV, and how feeder airtime is split among the UAVs under one HAPS) coupled to the present per-user service/access-link MDP (which HAPS, or which UAV if one has feeder capacity, a user associates with); the access hop itself contributes no action, since its SINR is fixed by the chosen UAV's geometry once the feeder decision is made. The six-hour-ahead feeder rain forecast is naturally an input to the feeder MDP, not the service/access MDP it informs today: a forecasted fade gives the feeder layer lead time to rebalance airtime across UAVs \emph{before} the fade hits, which is exactly the decision this ablation shows the forecast currently has no effect on.
 
 \section{Conclusion}
 \label{sec:conclusion}
@@ -1461,37 +1507,54 @@ and train a DQN agent for user-platform association (\S\ref{sec:dqn-results}).
 \paragraph{Channel model.} Spatial SINR heterogeneity, not distance alone,
 dominates service-link quality: a 9.94\,dB spread at a fixed 50\,km radius
 (\S\ref{sec:channel-model-summary}) exceeds the degradation from doubling distance.
-The backhaul link remains noise-limited and largely unaffected by constellation
-geometry, while scintillation adds a frequency- and elevation-dependent
+The backhaul link remains noise-limited even though the Gateway (now fixed at the
+constellation centroid) is equidistant from the serving HAPS and both interferers;
+directional discrimination on both the interferers' transmit beams and the Gateway's own
+receive beam, not distance, is what keeps constellation geometry from mattering here.
+Scintillation adds a frequency- and elevation-dependent
 fade on both links (\S\ref{subsec:scintillation}).
 
 \paragraph{Relay path analysis.} The topology's actual relay route,
 HAPS$\rightarrow$UAV$\rightarrow$UE (\S\ref{sec:relay-path-analysis}), was
-evaluated as an alternative to the direct service link. The access hop (UAV$\rightarrow$UE) is
-$\approx+33$\,dB SINR at 500\,m because the UAV hovers close to the user it serves. The feeder hop
-(HAPS$\rightarrow$UAV, 38\,GHz) has antenna gains $G_h=13.8$\,dBi and $G_u=30.7$\,dBi
-(\cite{karaman2025haps,anim2021uav}); its SINR is $+37.6$\,dB at nadir and $+22.6$\,dB at 100\,km, well above the
+evaluated as an alternative to the direct service link. The UAV relay is fixed 0.1\,km from
+the serving HAPS's own nadir (not hovering above the user it serves), so the feeder hop
+(HAPS$\rightarrow$UAV, 38\,GHz) is a constant, near-zenith ($89.71^\circ$) link for every
+user: $\mathrm{SINR}\approx+37.6$\,dB (antenna gains $G_h=13.8$\,dBi and $G_u=30.7$\,dBi,
+\cite{karaman2025haps,anim2021uav}), well above the
 $+8$\,dB design floor (Eq.~\eqref{eq:sinr-min-design}, derived from the 16-QAM/CQI-7 minimum-MCS SINR at 10\% BLER~\cite{3gpp_ts38214}
-plus a 3\,dB margin). The direct HAPS$\rightarrow$UE link, which shares the 2\,GHz band with the other two HAPS, falls from
-$+7.3$\,dB to $-9.1$\,dB. The decode-and-forward end-to-end capacity is $11.1$\,bits/s/Hz at nadir and $7.5$\,bits/s/Hz at 100\,km,
-against the direct link's $2.7$ and $0.5$\,bits/s/Hz. The relay therefore outperforms
-the direct link at every distance in this model. A practical implication for
-deployment: the 38\,GHz feeder hop's rain and scintillation losses both grow
-sharply as elevation drops with increasing HAPS--UAV distance (\S\ref{subsec:scintillation}),
-so keeping the UAV relay near the HAPS nadir -- at as high an elevation angle as
-feasible -- limits this slant-path penalty, even though the feeder SINR stays
-above the design floor across the full range modelled here. Near-nadir
+plus a 3\,dB margin). The access hop (UAV$\rightarrow$UE) instead depends on each user's
+real, growing distance from that one fixed point: its SINR falls from $\approx+33$\,dB for a
+user at the UAV to $-37.7$\,dB at 100\,km. The direct HAPS$\rightarrow$UE link, which shares
+the 2\,GHz band with the other two HAPS, degrades far more slowly, from
+$+7.3$\,dB to $-4.3$\,dB over the same range. The decode-and-forward end-to-end relay
+capacity is therefore bottlenecked by the access hop beyond the UAV's immediate vicinity:
+$11.05$\,bits/s/Hz right at the UAV, falling below the direct link's $2.67$\,bits/s/Hz by
+about 5--6\,km (suburban) to 1--2\,km (high-rise), and to $0.56$\,bits/s/Hz by 10\,km. The
+relay therefore outperforms the direct link only within this small radius of the serving
+HAPS's own nadir: beyond it, the UAV has no access-hop reach at all, not a weaker signal.
+The access hop degrades faster than the direct link with real user distance because the
+UAV's 500\,m altitude loses elevation and LoS probability far sooner than the HAPS's
+20\,km altitude does. A practical implication for
+deployment: the 38\,GHz feeder hop's rain and scintillation losses are both small at this
+fixed near-zenith elevation (\S\ref{subsec:scintillation}), so the limiting factor for the
+relay's usefulness is the access hop's reach, not the feeder hop's quality. Near-nadir
 positioning also tends to place the UAV away from the interferer-facing
 sector (\S\ref{sec:channel-model-summary}), but this is not a single clean
 optimization: each HAPS could simultaneously be a serving node (near-nadir,
 low-loss, for its own users) and an interferer (for the other two HAPS'
 users), so jointly optimizing UAV/HAPS positioning across both roles at
-once, rather than each in isolation, is left to future work.
-DQN association agent (\S\ref{sec:lstm-dqn-motivation}) can route traffic through the UAV relay, as one of its six actions.
+once, rather than each in isolation, is left to future work. Since one UAV only covers a
+disk of effective radius $R_{\text{eff}}\approx6.5$\,km (urban; \S\ref{sec:relay-path-analysis}),
+tiling the full 100\,km-radius service area with non-overlapping disks of that size needs
+$\approx$205 UAVs by an idealized covering-number estimate (no cross-UAV interference,
+mobility, or selection policy modeled) -- Table~1's single relay UAV demonstrates the
+two-hop capacity model, not a coverage solution; sizing and coordinating a UAV fleet across
+the service area is left to future work.
+The DQN association agent (\S\ref{sec:lstm-dqn-motivation}) can route traffic through the UAV relay, as one of its six actions, but under this geometry it is a narrow, near-HAPS-nadir option rather than a uniformly-better alternative to the direct link.
 
 \paragraph{Learned association.} The LSTM-fed DQN agent (\S\ref{sec:dqn-results}) has the highest reward of the policies tested on the held-out 2025 days ($+1.4$ per step, against $-3.8$ for a max-throughput rule over the same six actions and $-14.5$ for max-SINR), with zero outage and per-user throughput fairness close to the max-throughput rule (Jain $0.98$ against $0.99$; the difference is not significant). The reward advantage over the max-throughput rule holds on all five experiments. Max-SINR assumes the SINR to every platform is known at decision time, which a deployed system must measure, and it cannot use the relays. Two
 directions for future work follow: (1) adding a fairness-aware reward to test whether the learned policy trades fairness for throughput, and testing on harder (e.g.\ rain- or
-mobility-heavy) scenarios, and (2) learning how the relay options are used across user distances, since the relay outperforms the direct link at every
+mobility-heavy) scenarios, and (2) learning how the relay options are used across user distances, since the relay now outperforms the direct link only within a small radius of the UAV's fixed near-HAPS-nadir position (\S\ref{sec:relay-path-analysis}) rather than at every
 distance in this model, so the learned
 policy decides when relaying is
 worthwhile as a function of user distance.

@@ -21,8 +21,28 @@ Why This Matters:
     - Feeder link rain affects SINR/capacity (separate model)
 """
 
-import numpy as np
+import os
+import sys
 from typing import Tuple
+
+import numpy as np
+
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+if _THIS_DIR not in sys.path:
+    sys.path.insert(0, _THIS_DIR)
+from geometry_config import compute_placement  # noqa: E402
+
+# Gateway placement, read once from config/geometry.json via geometry_config
+# (defaults to today's static_gw centroid placement if that file doesn't
+# exist yet). K_RAIN/ALPHA_RAIN are computed dynamically from whatever
+# elevation that placement resolves to (itur.models.itu838, not hardcoded
+# per-scenario magic numbers), so any custom Gateway placement gets
+# physically correct rain coefficients.
+_GW_PLACEMENT = compute_placement('gateway')
+# The UAV's own near-zenith feeder-hop geometry (static_gw: 0.1 km from the serving
+# HAPS's nadir), for that hop's OWN rain exposure -- separate from, and much smaller
+# than, the Gateway backhaul's -- see uav_feeder_rain_effect_on_capacity() below.
+_UAV_PLACEMENT = compute_placement('uav')
 
 
 class HAPSBatteryModel:
@@ -141,34 +161,20 @@ class HAPSBatteryModel:
         return new_soc_percent, debug
 
 
-def feeder_link_rain_effect_on_capacity(rain_mm_h: float) -> dict:
-    """Compute feeder link attenuation due to rain (affects CAPACITY, not battery).
-
-    NOTE: This is SEPARATE from battery model.
-    Rain affects link SINR/capacity, not platform power consumption.
-
-    Args:
-        rain_mm_h: Rainfall rate (mm/h)
-
-    Returns:
-        Dict with attenuation and resulting capacity
-    """
-    # ITU-R P.838 specific attenuation at 38 GHz, 89.86 deg elevation (gateway
-    # geometry), horizontal polarisation: gamma_R = K_RAIN * R^ALPHA_RAIN [dB/km].
-    # Source: itur.models.itu838.rain_specific_attenuation_coefficients(38, 89.86, 0)
-    K_RAIN = 0.3923
-    ALPHA_RAIN = 0.8687
-
-    # ITU-R P.839 rain height for Delhi (28.61 N, 77.21 E), km.
-    # Source: itur.models.itu839.rain_height(28.61, 77.21)
-    H_RAIN_KM = 5.278
-    H_GATEWAY_KM = 0.05          # gateway altitude (50 m AGL)
-    ELEVATION_DEG = 89.86        # HAPS (20 km) to gateway, near zenith
+def _rain_loss_db(rain_mm_h: float, placement: dict, h_rain_km: float = 5.278) -> dict:
+    """ITU-R P.838 specific attenuation + P.618 slant-path reduction, for whichever
+    hop's placement dict is passed in (Gateway backhaul or UAV feeder -- same formula,
+    different elevation/altitude/rain coefficients, since both derive from
+    geometry_config.compute_placement()). h_rain_km: ITU-R P.839 rain height for Delhi
+    (28.61 N, 77.21 E) -- site-specific, not geometry-specific."""
+    K_RAIN, ALPHA_RAIN = placement['k_rain'], placement['alpha_rain']
+    H_NEAR_END_KM = placement['alt_m'] / 1000.0
+    ELEVATION_DEG = placement['elevation_deg']
 
     specific_db_per_km = K_RAIN * (max(rain_mm_h, 0.0) ** ALPHA_RAIN)
 
     # ITU-R P.618 slant path through the rain layer.
-    slant_rain_km = (H_RAIN_KM - H_GATEWAY_KM) / np.sin(np.radians(ELEVATION_DEG))
+    slant_rain_km = (h_rain_km - H_NEAR_END_KM) / np.sin(np.radians(ELEVATION_DEG))
     horiz_rain_km = slant_rain_km * np.cos(np.radians(ELEVATION_DEG))
 
     # P.618 path reduction factor (Eq. 2.2.1.1 of ITU-R P.618).
@@ -184,6 +190,45 @@ def feeder_link_rain_effect_on_capacity(rain_mm_h: float) -> dict:
         "effective_path_km": effective_path_km,
         "total_rain_loss_db": total_rain_loss_db
     }
+
+
+def feeder_link_rain_effect_on_capacity(rain_mm_h: float) -> dict:
+    """Backhaul (HAPS-to-Gateway) rain attenuation (affects CAPACITY, not battery).
+
+    NOTE: This is SEPARATE from battery model.
+    Rain affects link SINR/capacity, not platform power consumption.
+
+    Gateway placement comes from config/geometry.json (see models/geometry_config.py;
+    defaults to today's static_gw centroid placement, ~37.53 km horizontal offset from
+    the serving HAPS, circumradius of the 65 km equilateral triangle -- not co-located
+    under the HAPS). The feeder-hop elevation angle (and therefore the ITU-R P.838
+    specific-attenuation coefficients, which depend on elevation via the
+    horizontal/vertical polarisation mix, P.618 Sec. 2.2.1.1) is derived from that
+    placement, not hardcoded: gamma_R = K_RAIN * R^ALPHA_RAIN [dB/km].
+
+    Args:
+        rain_mm_h: Rainfall rate (mm/h)
+
+    Returns:
+        Dict with attenuation and resulting capacity
+    """
+    return _rain_loss_db(rain_mm_h, _GW_PLACEMENT)
+
+
+def uav_feeder_rain_effect_on_capacity(rain_mm_h: float) -> dict:
+    """UAV relay's OWN feeder-hop (HAPS-to-UAV, near-zenith) rain attenuation --
+    separate from, and (at Delhi's R_0.1=15.7 mm/h) larger than,
+    feeder_link_rain_effect_on_capacity()'s backhaul figure above (~16.6 dB vs.
+    ~8.6 dB), because this hop's near-90-deg elevation (static_gw: UAV 0.1 km
+    from the serving HAPS's own nadir) stays inside the rain cell for its whole
+    traversal instead of crossing it obliquely, which the ITU-R P.618 reduction
+    factor derates less than the backhaul's shallower, longer slant path.
+    Previously this hop's capacity (channel_model.py) only modelled free-space
+    loss + scintillation, with no rain term at all, which made the relay and
+    direct paths' rain exposure identical in the DQN's reward by omission, not
+    by any genuine physical equivalence -- this function is what closes that
+    gap."""
+    return _rain_loss_db(rain_mm_h, _UAV_PLACEMENT)
 
 
 # ===== Unit Tests =====

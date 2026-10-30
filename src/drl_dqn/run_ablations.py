@@ -42,9 +42,16 @@ def train_dqn(seed: int, train_eps, forecast: str, device: str) -> DQNAgent:
         s = env.reset()
         for _ in range(MAX_STEPS):
             actions = agent.act_batch(s)
-            s2, r, done, _ = env.step(actions)
+            feeder_ctx = s.mean(axis=0)
+            feeder_raw = agent.act(feeder_ctx)
+            feeder_choice = feeder_raw % env.n_haps
+            s2, r, done, _ = env.step(actions, feeder_choice=feeder_choice)
+            feeder_ctx2 = s2.mean(axis=0)
             for k in range(env.n_users):
                 agent.remember(s[k], actions[k], r[k], s2[k], done)
+            # Same shared network/buffer also learns the per-UAV feeder-HAPS choice,
+            # off the step-level (mean) reward -- see haps_association_env.step().
+            agent.remember(feeder_ctx, feeder_raw, float(r.mean()), feeder_ctx2, done)
             agent.train_step()
             s = s2
         agent.decay_eps()
@@ -64,7 +71,7 @@ def main() -> None:
             np.random.seed(seed + 1000)  # same reseed as run_multiseed.evaluate, for matching results
             env = RealEpisodeEnv(eval_eps, seed=seed + 1000, forecast=variant)
             policy = lambda e, s: agent.act_batch(s)  # noqa: E731
-            per_episode = [run_episode(env, policy) for _ in range(len(eval_eps))]
+            per_episode = [run_episode(env, policy, agent=agent) for _ in range(len(eval_eps))]
             df = pd.DataFrame(per_episode)
             rows.append({
                 "variant": variant, "seed": seed,

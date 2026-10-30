@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
 Single-UAV coverage-radius study, and a covering-number estimate for the
-service area -- supporting evidence for the paper's future-work conclusion
-that a single static UAV (Table 1: count=1) leaves most of the 100 km
-service area without usable relay capacity, and that more study is needed
-on deploying several UAVs.
+service area -- supporting evidence for the paper's conclusion that a single
+static UAV (Table 1: count=1), fixed near the serving HAPS's own nadir
+(static_gw geometry), only usefully relays traffic within a small radius of
+that fixed point, and that covering the full 100 km service area requires a
+fleet of such UAVs tiled across it, not a single relay node.
 
 Deliberately evaluates only ONE UAV at a time (never several simultaneously):
 placing multiple UAVs together would require modeling cross-UAV / UAV-UAV
@@ -34,7 +35,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import numpy as np
 import pandas as pd
-from models.channel_model import haps_constellation_geometry, uav_relay_two_hop_capacity_bps_hz
+from models.channel_model import uav_relay_two_hop_capacity_bps_hz
+from models.geometry_config import compute_placement
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 OUT_DIR = os.path.join(ROOT, 'data', 'processed', 'uav_placement')
@@ -44,12 +46,12 @@ ENV = "urban"
 USABLE_BPS_HZ = 0.5
 SERVICE_RADIUS_KM = 100.0
 
-# Single, fixed HAPS->UAV feeder distance (circumradius of the 65 km-spacing
-# equilateral triangle, same convention as haps_association_env.py / the main
-# model) -- not the bottleneck here; the access hop collapses well before it.
-nodes = haps_constellation_geometry(spacing_km=65.0)
-haps_xy = np.array([[nodes[k][0], nodes[k][1]] for k in ('serving', 'interferer1', 'interferer2')])
-R_HAPS_UAV_KM = float(np.linalg.norm(haps_xy[0] - haps_xy.mean(axis=0))) / 1000.0
+# Single, fixed HAPS->UAV feeder distance, read from config/geometry.json via
+# models.geometry_config (static_gw branch: ~0.1 km from the serving HAPS's
+# own nadir, not the triangle's circumradius -- the Gateway now occupies the
+# centroid instead; see generate_uav_relay_table.py). Not the bottleneck here;
+# the access hop collapses well before the feeder hop does.
+R_HAPS_UAV_KM = compute_placement('uav')['horiz_offset_km']
 
 # ---- Step 1: single-UAV radial sweep ----
 dists_km = np.arange(0.0, 30.01, 0.25)

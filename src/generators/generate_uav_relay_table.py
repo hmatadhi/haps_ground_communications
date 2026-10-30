@@ -9,12 +9,19 @@ uav_relay_two_hop_capacity_bps_hz(): a 38 GHz HAPS->UAV first hop (feeder-
 style slant path with ITU-P.618 scintillation) bottlenecked, decode-and-
 forward, against a 2 GHz, landscape-dependent UAV->UE second hop.
 
-The single relay UAV is static (Table 1: count=1, no mobility) and fixed at
-the HAPS triangle's centroid -- so the HAPS->UAV feeder distance is now a
-CONSTANT (R_HAPS_UAV_M, the triangle's circumradius), not the sweep variable.
-This replaces an earlier version of this script that (incorrectly) assumed
-the UAV always hovers within a small fixed offset of whichever user it
-serves, which made the UAV->UE hop unrealistically good at every distance.
+The single relay UAV is static (Table 1: count=1, no mobility). Its
+placement (default: static_gw branch geometry -- a short, fixed horizontal
+offset of 0.1 km from the serving HAPS's own nadir, along the good-sector
+azimuth: the direction from the serving HAPS away from the two
+interferers' midpoint, so it sits inside the "good sector" of Fig. 6 rather
+than at an arbitrary angle) is read from config/geometry.json via
+models.geometry_config.compute_placement("uav")/node_xy_km("uav"), not
+hardcoded here. This is the mirror of generate_relay_table.py's Gateway,
+whose default placement is the triangle's centroid instead. An earlier
+version fixed the UAV at the centroid (constant, ~37.5 km feeder distance);
+before that, an even earlier version (incorrectly) assumed the UAV always
+hovers within a small fixed offset of whichever user it serves, which made
+the UAV->UE hop unrealistically good at every distance.
 
 Sweeps horizontal distance from the serving HAPS (0-100 km, matching the
 Relay rows in generate_pathloss_table.py), azimuth-averaged around that HAPS
@@ -34,21 +41,24 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from models.channel_model import (
     haps_a2g_pathloss_db, rx_power_dbm, sinr_db, uav_relay_two_hop_capacity_bps_hz,
-    haps_constellation_geometry, multi_node_sinr_db_spatial,
+    multi_node_sinr_db_spatial,
     HAPS_ALT_M, UAV_ALT_M, P_TX_HAPS_DBM, NOISE_DBM, ENVIRONMENTS,
 )
+from models.geometry_config import compute_placement, node_xy_km
 
-# Single static relay UAV (Table 1: count=1, no mobility), fixed at the HAPS triangle's
-# centroid -- matches haps_association_env.py's fix for the same previously-incorrect
-# "UAV always ~hovers next to whichever user it serves" assumption (reviewer feedback:
-# Table 1 says 1 static UAV, but that assumption made the UAV->UE hop unrealistically
-# good at every distance). With the UAV fixed at the centroid, the HAPS->UAV feeder
-# distance is CONSTANT (circumradius of the equilateral triangle, ~37.5 km at 65 km
-# spacing, the same for all three HAPS), while the UAV->UE access hop now varies with
-# each user's real distance from that one fixed point.
-_NODES = haps_constellation_geometry(spacing_km=65.0)
-_UAV_XY_M = np.mean([[_NODES[k][0], _NODES[k][1]] for k in ('serving', 'interferer1', 'interferer2')], axis=0)
-R_HAPS_UAV_M = float(np.linalg.norm(_UAV_XY_M - np.array([_NODES['serving'][0], _NODES['serving'][1]])))
+# Single static relay UAV (Table 1: count=1, no mobility). Its placement is
+# read from config/geometry.json (defaults to today's static_gw geometry --
+# 0.1 km from the serving HAPS's own nadir, along the good-sector azimuth --
+# if that file doesn't exist yet; see models/geometry_config.py). The
+# serving HAPS is always at (0, 0) in haps_constellation_geometry(), so the
+# UAV's resolved (x, y) is already relative to it. Since the HAPS altitude
+# (20 km) dwarfs a small horizontal offset, a near-serving-nadir placement
+# gives a near-zenith HAPS->UAV feeder hop (elevation ~89 deg), same
+# convention previously used for the Gateway's feeder hop in
+# generate_relay_table.py (for a centroid-like placement instead).
+_UAV_PLACEMENT = compute_placement('uav')
+R_HAPS_UAV_M = _UAV_PLACEMENT['horiz_offset_km'] * 1000.0
+_UAV_XY_M = node_xy_km('uav') * 1000.0  # (2,) array [m], relative to the serving HAPS's nadir
 
 # Output directories (matches generate_relay_table.py's convention: run from
 # src/, write into src/appendix_data and src/appendix_tables, and a figure
@@ -89,11 +99,13 @@ for env in LANDSCAPES:
             for a in azimuths]))
         capacity_direct = float(np.log2(1.0 + 10.0 ** (sinr_direct_db / 10.0)))
 
-        # Relay HAPS->UAV->UE, with the UAV fixed at the centroid (see R_HAPS_UAV_M above):
-        # the feeder hop (HAPS->UAV) is now a constant distance, not r_m -- r_m instead
-        # drives the UAV->UE access hop's real distance, azimuth-averaged around the
-        # serving HAPS (same azimuthal averaging convention as the direct-link SINR
-        # just above), since the UAV sits off-axis from the serving HAPS's nadir.
+        # Relay HAPS->UAV->UE, with the UAV fixed near the serving HAPS's nadir
+        # (see R_HAPS_UAV_M above): the feeder hop (HAPS->UAV) is a constant,
+        # near-zenith distance, not r_m -- r_m instead drives the UAV->UE
+        # access hop's real distance, azimuth-averaged around the serving
+        # HAPS (same azimuthal averaging convention as the direct-link SINR
+        # just above), since the UAV sits slightly off-axis from the serving
+        # HAPS's nadir (along the good-sector azimuth).
         uav_ue_dists_m = np.sqrt(
             (r_m * np.cos(azimuths) - _UAV_XY_M[0]) ** 2 + (r_m * np.sin(azimuths) - _UAV_XY_M[1]) ** 2
         )
@@ -166,7 +178,7 @@ latex_appendix = f"""\\begin{{table}}[htbp]
 \\centering
 \\small
 {latex_main}
-\\caption{{Table A.4: Direct (HAPS\\textrightarrow UE) vs. relay (HAPS\\textrightarrow UAV\\textrightarrow UE) link comparison, suburban and high-rise landscapes, as a function of distance from the serving HAPS, azimuth-averaged (best/worst case for the landscape-dependent second hop; full 4-landscape data in \\texttt{{appendix\\_data/UAV\\_relay\\_path\\_comparison.csv}}). The relay UAV is static, fixed at the HAPS triangle's centroid ({UAV_ALT_M:.0f}\\,m altitude, {R_HAPS_UAV_M/1000:.1f}\\,km from each HAPS); the 38\\,GHz HAPS\\textrightarrow UAV feeder hop is therefore a constant, landscape-independent link, while the 2\\,GHz UAV\\textrightarrow UE access hop uses each user's real, azimuth-dependent distance to that fixed point with the landscape-dependent LoS/NLoS blended model (\\S III.C). $C_{{\\text{{relay}}}} = \\min(C_{{\\text{{haps-uav}}}}, C_{{\\text{{uav-ue}}}})$, implemented in \\texttt{{uav\\_relay\\_two\\_hop\\_capacity\\_bps\\_hz()}}.}}
+\\caption{{Table A.4: Direct (HAPS\\textrightarrow UE) vs. relay (HAPS\\textrightarrow UAV\\textrightarrow UE) link comparison, suburban and high-rise landscapes, as a function of distance from the serving HAPS, azimuth-averaged (best/worst case for the landscape-dependent second hop; full 4-landscape data in \\texttt{{appendix\\_data/UAV\\_relay\\_path\\_comparison.csv}}). The relay UAV is static, hovering at {UAV_ALT_M:.0f}\\,m altitude, {R_HAPS_UAV_M/1000.0:.1f}\\,km from the serving HAPS's nadir along the good-sector azimuth of Fig.~6; the 38\\,GHz HAPS\\textrightarrow UAV feeder hop is therefore a constant, near-zenith, landscape-independent link, while the 2\\,GHz UAV\\textrightarrow UE access hop uses each user's real, azimuth-dependent distance to that fixed point with the landscape-dependent LoS/NLoS blended model (\\S III.C). $C_{{\\text{{relay}}}} = \\min(C_{{\\text{{haps-uav}}}}, C_{{\\text{{uav-ue}}}})$, implemented in \\texttt{{uav\\_relay\\_two\\_hop\\_capacity\\_bps\\_hz()}}.}}
 \\label{{table:app-uav-relay-comparison}}
 \\end{{table}}
 """
@@ -210,7 +222,7 @@ ax.axhline(0, color='gray', linestyle=':', linewidth=1, label='0 dB (unity SINR)
 
 ax.set_xlabel('Distance from serving HAPS [km]')
 ax.set_ylabel('SINR [dB]')
-ax.set_title('Direct Link vs. HAPS→UAV→UE Relay Hops (static UAV at centroid)')
+ax.set_title('Direct Link vs. HAPS→UAV→UE Relay Hops (static UAV near HAPS nadir, good sector)')
 ax.grid(True, alpha=0.3)
 ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.16), ncol=2, fontsize=9, frameon=False)
 fig.tight_layout()

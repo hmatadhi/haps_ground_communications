@@ -95,87 +95,84 @@ HAPS, UAV, non-terrestrial networks, air-to-ground channel, LoS probability, SIN
 \section{Introduction}
 % =====================================================================
 
-A High-Altitude Platform Station (HAPS) is a stratospheric, solar-powered platform at approximately 20~km altitude with a fixed service footprint of up to 100~km radius. It connects to the ground over three link types:
+A High-Altitude Platform Station (HAPS) is a stratospheric, solar-powered platform at approximately 20~km altitude with a fixed service footprint of up to 100~km radius. It connects to the User Equipment(UE) on the ground over three link types:
 
 \begin{itemize}\setlength{\itemsep}{1pt}
   \item \textbf{Service link} (HAPS to UE, 2--2.2~GHz): direct, long-range connectivity without specialized ground hardware.
   \item \textbf{Backhaul link} (HAPS to Gateway, 38.0--39.5~GHz Ka-band, WRC-19): high-capacity ground-gateway connectivity.
-  \item \textbf{Relay link} (HAPS to Unmanned Aerial Vehicle (UAV) to UE): a two-hop backup path for users with a poor direct link -- a 38~GHz feeder hop (HAPS--UAV, same band as the backhaul) followed by a 2~GHz access hop (UAV--UE) from a UAV hovering at lower altitude.
+  \item \textbf{Relay link} (HAPS to Unmanned Aerial Vehicle (UAV) to UE): a two-hop path -- a 38~GHz feeder hop (HAPS--UAV, same band as the backhaul) followed by a 2~GHz access hop (UAV--UE) from a UAV hovering at lower altitude.
 \end{itemize}
 
-The 38~GHz backhaul/feeder links incur significant atmospheric loss (rain, fog, gas), chosen to sit between the 22.235~GHz water-vapor and 60~GHz oxygen absorption resonances~\cite{itu_p676}, a placement this paper validates numerically in \S\ref{sec:results} (Fig.~\ref{fig:atm_frequency_nominal}). The 2~GHz service/relay links are resilient to atmospheric effects~\cite{itu_p618} but sensitive to building blockage.
+A major challenge faced in HAPS-GROUND communication is to decide upon the best link and when to choose it. The 38~GHz backhaul/feeder links incur significant atmospheric loss (rain, fog, gas). The 2~GHz service links are resilient to atmospheric effects~\cite{itu_p618} but are shared by many users in the large HAPS coverage area resulting in outages. The relay path's access hop has a limited range and is sensitive to building blockages.
 
-Distance-only link budgeting leaves open a second question: with three HAPS sharing spectrum, could co-channel interference from the other two platforms make Signal-to-Interference-plus-Noise Ratio (SINR) depend as much on angular position as on distance? A static analysis cannot react to this, or to time-varying rain fades on the 38~GHz backhaul. This paper validates that this is indeed the case, motivating an AI-ready model: a validated channel model, a Long Short-Term Memory (LSTM) rain forecaster, and a Deep Q-Network (DQN) agent that learns real-time user--platform association.
-
-\textbf{Research flow.} The remainder of this paper follows three stages: (1) a reproducible, ITU-R-based \emph{channel and attenuation model} -- free-space path loss, rain/fog/gas/scintillation, and multi-HAPS interference for the HAPS, UAV and gateway links (\S\ref{sec:topology}--\S\ref{sec:multihaps}), characterised numerically in \S\ref{sec:results} to show where interference limits the 2~GHz service link and why the 38~GHz backhaul does not, and the HAPS$\to$UAV$\to$UE relay path as an alternative to the direct service link; (2) three \emph{baseline association policies} -- random, max-SINR, and max-throughput rules -- evaluated on that channel model to establish how much association choice alone matters (\S\ref{sec:baseline-policies}); and (3) a \emph{learned association policy} -- an LSTM rain forecaster (\S\ref{sec:lstm}), benchmarked out-of-sample against persistence, feeding a DQN agent (\S\ref{sec:dqn}) trained on 2024 weather and evaluated on held-out 2025 days against the stage-2 baselines (\S\ref{sec:dqn-results}).
-
-\begin{figure}[H]
-\centering
-\footnotesize
-\fbox{\parbox{0.85\columnwidth}{\centering Attenuation \& channel models\\(FSPL, rain, fog, gas, scintillation, interference)}}\\[1mm]
-$\downarrow$\\[1mm]
-\fbox{\parbox{0.85\columnwidth}{\centering Baseline policies\\(random, max-SINR, max-throughput)}}\\[1mm]
-$\downarrow$\\[1mm]
-\fbox{\parbox{0.85\columnwidth}{\centering Learned policy\\(LSTM rain forecast + DQN) for platform selection}}
-\caption{Research flow: the three stages of this paper, from channel/attenuation modeling through rule-based baselines to the learned LSTM+DQN association policy.}
-\label{fig:research-flow}
-\end{figure}
-\FloatBarrier
+Distance-only link budgeting discounts co-channel interference from the other two platforms and the constellation geometry that can affect a link's Signal-to-Interference-plus-Noise Ratio (SINR), making SINR-vs-distance alone an incomplete measure. This paper explores the possibility of an AI-ready model through a validated channel model, a Long Short-Term Memory (LSTM) rain forecaster, and a Deep Q-Network (DQN) agent that learns real-time user--platform association.
 
 % =====================================================================
 \section{Related Work}
 \label{sec:related-work}
 % =====================================================================
 
-\textbf{Building-blockage/LoS modeling (2~GHz access tier).} Holis and Pechac~\cite{holispechac2008} give the elevation-dependent building-blockage shadowing model this paper adopts for the 2~GHz service link and the relay's access hop, originally formulated for a single serving platform with no co-channel interference term; ITU-R P.1410~\cite{itu_p1410} offers a simpler elevation-angle-only LoS baseline that the Holis--Pechac model refines with building geometry. The 38~GHz backhaul/feeder link does not need this model: its near-nadir geometry (\S\ref{sec:topology}) avoids building obstruction, so atmospheric loss (rain/fog/gas, \S\ref{sec:channel-models}) is the dominant impairment there instead.
+\begin{itemize}\setlength{\itemsep}{2pt}
+  \item \textbf{Holis and Pechac~\cite{holispechac2008}}: gives an elevation-dependent building-blockage shadowing model for a single serving platform with no co-channel interference term; we adopt it for the 2~GHz service and access links.
+  \item \textbf{ITU-R P.1410~\cite{itu_p1410}}: gives a simpler, elevation-angle-only LoS baseline; we use Holis and Pechac's model instead, since it refines this with building geometry.
+  \item \textbf{Arani \emph{et al.}~\cite{arani2023}}: apply DRL to a single, time-invariant HAPS--UAV pair with a throughput-only reward; we instead model 3-HAPS angular co-channel interference (9.94\,dB swing, \S\ref{sec:multihaps}), a weather-aware LSTM forecast, and a fairness/battery-aware reward (\S\ref{sec:dqn}).
+  \item \textbf{Liu \emph{et al.}~\cite{liu2026multihaps}}: jointly optimize multi-HAPS user association and beamforming under a static, weather-blind channel; we model a weather-aware, time-varying channel instead and leave joint beamforming to future work.
+  \item \textbf{Naous \emph{et al.}~\cite{naous2023rlsky}}: survey RL across non-terrestrial platforms and note most association work assumes a static channel or omits weather-driven feeder variability; this is the gap our LSTM-fed DQN targets.
+  \item \textbf{Mnih \emph{et al.}~\cite{mnih2015dqn} and Sutton and Barto~\cite{sutton2018rl}}: give the DQN algorithm and RL theory our agent design builds on (\S\ref{sec:dqn}).
+  \item \textbf{Schulman \emph{et al.}~\cite{schulman2017ppo}}: introduce PPO; we use DQN instead, since DQN reuses past transitions from a replay buffer across many updates, which suits our fixed historical weather record better than PPO's fresh-rollout training.
+  \item \textbf{Cornejo \emph{et al.}~\cite{cornejo2022lstmrain}}: train an LSTM on synthetic, ITU-R-derived rain traces for satellite links; we train on multi-year real weather data (NASA POWER, METAR, ERA5, 2023--2026) for a specific HAPS feeder geometry instead, benchmarked against persistence.
+  \item \textbf{ECC Report 156~\cite{ecc_report_156}}: gives Ka-band rain-margin guidance for FSS links; our model's computed rain margins (\S\ref{subsec:backhaul-model}) are consistent with it.
+  \item \textbf{Svistunov \emph{et al.}~\cite{svistunov2025haps}}: survey HAPS channel modeling, interference control, and AI-driven resource allocation at a high level; this paper provides one of the quantitative instances -- a validated channel model and a trained, evaluated association policy -- that survey calls for.
+  \item \textbf{Bakambekova \emph{et al.}~\cite{bakambekova2024}}: survey AI for space-air-ground integrated networks and identify weather-aware, cross-layer learning as an open direction at the SAGIN level; this paper provides one such instance at the HAPS layer.
+\end{itemize}
 
-\textbf{Multi-HAPS co-channel interference.} Arani \emph{et al.}~\cite{arani2023} study HAPS--UAV heterogeneous networks with a Deep Reinforcement Learning (DRL) controller, closest in spirit to the association problem here, but evaluate a single HAPS--UAV pair with a time-invariant channel and a throughput-only objective; we make this delta explicit on three points. (i) \emph{Interference:} their controller has no co-channel term to learn around, while our 3-HAPS geometry shows angular position alone swings SINR by 9.94\,dB at fixed range (\S\ref{sec:multihaps}), a degree of freedom their setting cannot expose. (ii) \emph{Weather coupling:} their feeder/access channel is time-invariant, so the controller cannot anticipate fades; our DQN consumes a six-horizon LSTM rain forecast (\S\ref{sec:lstm}) specifically because the feeder link is not static. (iii) \emph{Reward structure:} we jointly penalize outage, fairness, and per-platform battery depletion (\S\ref{sec:dqn}, Eq.~\eqref{eq:reward}) in a single reward, rather than optimizing throughput alone, so the comparison against rule-based max-throughput/max-SINR baselines (\S\ref{sec:dqn-results}) isolates what the extra state (forecast, battery, fairness) buys over a narrower throughput-only objective. Liu \emph{et al.}~\cite{liu2026multihaps} optimize sum-rate and worst-case SINR across multiple cooperating HAPS and ground base stations via joint user association and beamforming, but likewise treat the channel as static and do not model time-varying rain fades or an onboard forecaster; our channel model instead quantifies the \emph{angular} SINR heterogeneity this cooperative setting would need to counteract, and complements it with the learned, weather-aware policy their static optimization does not provide.
-
-\textbf{Learned resource allocation and association in NTN.} Naous \emph{et al.}~\cite{naous2023rlsky} survey reinforcement learning across non-terrestrial platforms (satellites, HAPS, UAVs) and note that most RL-based association work either assumes a static channel or omits weather-driven feeder-link variability -- the gap this paper's LSTM-fed DQN targets. Foundational DQN~\cite{mnih2015dqn} and RL theory~\cite{sutton2018rl} underpin the agent design of \S\ref{sec:dqn}; PPO~\cite{schulman2017ppo} was considered but DQN suits this paper's small discrete (six-action) space better, at lower sample complexity. Fairness is quantified with the Jain index~\cite{jain1984quantitative}, and per-link SINR is combined in the linear domain following standard practice~\cite{goldsmith2005} rather than by averaging in dB.
-
-\textbf{Rain attenuation forecasting.} Cornejo \emph{et al.}~\cite{cornejo2022lstmrain} train an LSTM on synthetic, ITU-R-derived rain-attenuation traces for satellite links, reporting improved short-term prediction accuracy over classical models; this paper instead trains on several years of real, multi-source weather data (NASA POWER, METAR, ERA5, 2023--2026) for a specific HAPS feeder-link geometry and benchmarks against a persistence baseline, which (\S\ref{sec:lstm}) proves non-trivial to beat at short horizons. The resulting rain margins are consistent with the Ka-band FSS rain-margin guidance in ECC Report 156~\cite{ecc_report_156} (\S\ref{subsec:backhaul-model}).
-
-\textbf{Survey context.} The recent survey by Svistunov \emph{et al.}~\cite{svistunov2025haps} catalogs HAPS channel modeling, interference control, and AI-driven resource allocation at a high level, and the broader survey by Bakambekova \emph{et al.}~\cite{bakambekova2024} on AI for space-air-ground integrated networks identifies weather-aware, cross-layer learning as an open direction at the SAGIN level; this paper provides one of the quantitative instances -- a validated channel model and a trained, evaluated association policy -- that both surveys point to as needed.
-
-\textbf{Our Novelty.} Each paper above studies one of these elements on its own. How they work together has not been explored. This paper does exactly that. We build (i) an ITU-R-validated, multi-HAPS interference-aware channel model, showing that angular position can dominate distance in SINR; (ii) a rain forecaster evaluated on unseen (held-out) weather; and (iii) a DQN association policy evaluated against rule-based baselines on real held-out weather, with the forecast feeding the policy. This combination, not any single piece alone, is the contribution.
+\textbf{Our Novelty.} As we can notice the related work above try to address different aspects each but not together 
+\begin{itemize}
+  \item[-] co-channel interference without weather-awareness (Arani \emph{et al.}, Liu \emph{et al.}), 
+  \item[-] a static-channel association policy (Arani \emph{et al.}), 
+  \item[-] a rain forecaster trained on synthetic rather than real weather (Cornejo \emph{et al.})
+\end{itemize}
+-- this paper attempts to fill all of these gaps: an interference-aware channel model, a forecaster evaluated on real held-out weather, and a DQN association policy trained on that forecast and evaluated against rule-based baselines on the same real weather.
 
 % =====================================================================
 \section{System Topology, Channel, Propagation, and Interference Models}
 \label{sec:topology}
 % =====================================================================
 
-Our topology contains three HAPS nodes, one serving and two interfering, with one static UAV relay node and one ground gateway, with positioning details as in Table~\ref{tab:config} and depicted in Fig.~\ref{fig:simulation-topology}. The gateway and the UAV relay are situated independently of each other: the gateway sits near-nadir under the serving HAPS at an elevation of $\approx$89.86$^\circ$ to minimize backhaul slant distance, while the UAV relay is fixed at the HAPS-triangle's centroid (\S\ref{sec:relay-path-analysis}) to keep the feeder hop symmetric regardless of which HAPS relays.
+\subsection{Topology}
+
+Our topology contains three HAPS nodes, one serving and two interfering, with one static UAV relay node and one ground gateway, with positioning details as in Table~\ref{tab:config} and depicted in Fig.~\ref{fig:simulation-topology}. The gateway and the UAV relay are situated independently of each other: the gateway is fixed at the HAPS-triangle's centroid, 37.53\,km from the serving HAPS nadir, at an elevation of $\approx$27.995$^\circ$, while the UAV relay is fixed 0.1\,km from the serving HAPS's own nadir, along the good-sector azimuth (away from the midpoint of the two interfering HAPS), to keep the feeder hop near-zenith and noise-limited regardless of which HAPS relays.
+
+\begin{table}[htbp]
+\centering
+\caption{Simulated network configuration (AGL = above ground level)}
+\label{tab:config}
+{\scriptsize\setlength{\tabcolsep}{3pt}\renewcommand{\arraystretch}{0.9}
+\renewcommand{\tabularxcolumn}[1]{>{\arraybackslash}m{#1}}
+\begin{tabularx}{\columnwidth}{|>{\raggedright\arraybackslash\hsize=0.62\hsize}X|>{\raggedright\arraybackslash\hsize=0.68\hsize}X|>{\centering\arraybackslash\hsize=0.45\hsize}X|>{\raggedright\arraybackslash\hsize=1.25\hsize}X|}
+\hline
+\textbf{Node} & \textbf{Altitude} & \textbf{Count} & \textbf{Spacing} \\
+\hline
+HAPS & 20\,km & 3 & Equilateral 65\,km; 1 server, 2 interferers \\
+\hline
+UAV relay & 500\,m AGL & 1 & Fixed 0.1\,km from serving HAPS nadir, good-sector azimuth \\
+\hline
+Gateway & 50\,m AGL & 1 & Centroid-fixed, 37.53\,km from serving HAPS nadir \\
+\hline
+Users & 1.5\,m & $N$ & Uniform random in coverage \\
+\hline
+\end{tabularx}}
+\end{table}
+
+The UAV--UE access hop is dominated by horizontal offset and building blockage rather than altitude; and the direct HAPS--UE service link spans the full service radius, from near-zenith at nadir to low elevation at the 100~km edge.
 
 \vspace{-6pt}
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.72\linewidth]{./figures/network_diagram.pdf}
+\includegraphics[width=0.72\linewidth]{./figures/network_diagram_gw.pdf}
 \caption{Network topology: three HAPS nodes and one UAV relay serve ground users over an access layer; a single ground gateway aggregates the backhaul links into the core network.}
 \label{fig:simulation-topology}
 \end{figure}
-
-The UAV--UE access hop is dominated by horizontal offset and building blockage rather than altitude; and the direct HAPS--UE service link spans the full service radius, from near-zenith at nadir to low elevation at the 100~km edge.
-
-\begin{table}[H]
-\centering
-\caption{Simulated network configuration (AGL = above ground level)}
-\label{tab:config}
-{\scriptsize\setlength{\tabcolsep}{3pt}
-\renewcommand{\tabularxcolumn}[1]{>{\arraybackslash}m{#1}}
-\begin{tabularx}{\columnwidth}{|>{\raggedright\arraybackslash}X|>{\raggedright\arraybackslash}X|>{\centering\arraybackslash}X|>{\raggedright\arraybackslash}X|}
-\hline
-\textbf{Node} & \textbf{Altitude} & \textbf{Count} & \textbf{Spacing} \\
-\hline
-HAPS & 20\,km & 3 & Equilateral 65\,km, 1 server, 2 interferers \\
-\hline
-UAV relay & 500\,m AGL & 1 & Static, fixed at HAPS-triangle centroid (no mobility) \\
-\hline
-Gateway & 50\,m AGL & 1 & Near-nadir under serving HAPS (sited independently of the UAV relay, to minimize backhaul slant distance) \\
-\hline
-Users & 1.5\,m (hand-held) & $N$ (configurable) & Uniform random in coverage \\
-\hline
-\end{tabularx}}
-\end{table}
 
 \subsection{FSPL, Applicable to All Channels}
 
@@ -203,37 +200,18 @@ Rain attenuation $\gamma_R$ (dB/km) follows the ITU-R P.838 power law~\cite{itu_
 \label{eq:rain_spec_atten}
 \end{equation}
 
- Total rain loss is $A_\mathrm{rain}=\gamma_R L_\mathrm{eff}$, using the ITU-R P.618 effective slant length $L_\mathrm{eff}$~\cite{itu_p618}.
+Total rain loss is using the ITU-R P.618 effective slant length $L_\mathrm{eff}$~\cite{itu_p618}
+\begin{equation}
+A_\mathrm{rain}=\gamma_R L_\mathrm{eff},
+\label{eq:total_rain_loss}
+\end{equation}
 
-For backhaul, with $k\approx0.392$, $\alpha\approx0.869$ at 38~GHz for the near-nadir ($\approx89.86^\circ$) geometry (horizontal polarisation), giving $\gamma_R\approx2.9$\,dB/km at 10\,mm/h and $\approx6.4$\,dB/km at 25\,mm/h. 
-
-For the feeder, the HAPS--UAV hop sits at a much lower $\approx27.5^\circ$ elevation at the HAPS triangle's centroid (\S\ref{sec:relay-path-analysis}), and uses the corresponding different coefficients from the same ITU-R P.838 model, computed the same way.
-
-The simulated model is based on Delhi,  the backhaul/feeder margin  is evaluated at Delhi's rain statistics (ITU-R P.837), consistent with the 15--25\,dB Ka-band rain margins ECC Report 156~\cite{ecc_report_156} reports for FSS links.
-\begin{itemize}
-  \item At Delhi's rain rate, $R_{0.1}=15.7$\,mm/h, this gives $A_\mathrm{rain}\approx19$\,dB on the near-nadir gateway path.
-  \item Clear-sky backhaul SINR is $\approx+38$\,dB (\S\ref{sec:multihaps}), with $\approx0.4$\,dB of additional gas loss.
-  \item Resulting link margin: $38-19-0.4\approx18.6$\,dB at 99.9\,\% availability.
-\end{itemize}
-
-This margin deliberately omits fog/cloud ($<0.2$\,dB) and scintillation ($\le$0.6\,dB at $p=1\,\%$, derived below): both are small enough relative to rain's $\approx$19\,dB that folding them in would move the figure by at most $\approx$0.6--0.8\,dB (to $\approx$17.8--18\,dB). 
-
-\begin{figure}[H]\centering
-\includegraphics[width=0.95\columnwidth]{./figures/rain_attenuation_vs_distance.png}
-\caption{38~GHz backhaul rain attenuation vs.\ HAPS--Gateway horizontal distance (ITU-R P.838/P.618), grows faster than linear past $\approx$100\,km as elevation drops and the slant path lengthens (\S\ref{subsec:backhaul-model}).}
-\label{fig:rain-vs-distance}
-\end{figure}
-
-The conclusion being that the 38.0~GHz links are rain-dominated and the reason behind why the LSTM forecaster (\S\ref{sec:lstm}) targets rain attenuation alone and why scintillation is left out of the DQN's state (\S\ref{sec:dqn}).
-
-\textbf{Atmospheric Losses.} 
+\textbf{Atmospheric Losses.}
 Following are atmospheric losses that are modeled as specific attenuations times slant length:
 Fog/cloud loss (ITU-R P.840~\cite{itu_p840}):
  $A_\mathrm{cloud}=\gamma_c(f,M,T)L_\mathrm{slant}$
 Gas absorption (ITU-R P.676~\cite{itu_p676})
  $A_\mathrm{gas}=(\gamma_o+\gamma_w)L_\mathrm{slant}$;
-
- At 38~GHz, both terms are small over this path's slant length: fog loss totals $<0.2$\,dB, and gas loss totals $\approx0.4$\,dB (\S\ref{sec:results} discusses why 38~GHz keeps gas loss this low).
 
 \textbf{ Tropospheric scintillation}
 Tropospheric scintillation  (ITU-R P.618 Annex~1~\cite{itu_p618}) is given by 
@@ -271,10 +249,6 @@ The downlink SINR at user $k$ from node $u$ is then
 \label{eq:sinr}
 \end{equation}
 
-\label{sec:relay-path-analysis}
-
-\textbf{Relay Path Analysis (HAPS$\to$UAV$\to$UE).} A relay path is two hops: a feeder link from HAPS to UAV, and an access link from UAV to UE. In our model there is a single static relay UAV (Table~\ref{tab:config}) fixed at the HAPS triangle's centroid. So all three feeder hops (HAPS$\to$UAV) have one \textbf{constant} elevation ($\approx$27.5$^\circ$). \S\ref{sec:results} quantifies the resulting relay and access-hop capacity.
-
 \subsection{Interference Model}
 \label{sec:multihaps}
 
@@ -285,18 +259,12 @@ With three HAPS sharing spectrum, a serving HAPS $h$ provides the desired signal
 \end{equation}
 with channel gain $g_{h,r}=10^{-L_{h,r}^\mathrm{tot}/10}$ from the total propagation loss of \S\ref{sec:channel-models}.
 
-\textbf{Interference for Backhaul Link.} The gateway sits near the serving HAPS's nadir, while the two interfering HAPS are $\approx$65~km away and seen off-boresight through sidelobes (ITU-R F.699, floored at $-10$\,dBi). With directional antenna gains included ($G_h=13.8$\,dBi, $G_g=39.7$\,dBi), the interference term is $\approx-35$\,dB below the noise floor, so the backhaul SINR is $\approx+38$\,dB and \textbf{noise-limited}, essentially flat across the 10--500\,m gateway-offset range considered.
-
-\textbf{Interference for Feeder Links.} The single relay UAV is fixed at the HAPS triangle's centroid (\S\ref{sec:relay-path-analysis}), not tracking the user. This hop therefore has one \textbf{constant} geometry, regardless of distance or which HAPS relays: $\approx$27.5$^\circ$ elevation, noise-limited at $+30.7$\,dB. Antenna gains are $G_h=13.8$\,dBi and a UAV-mountable mmWave patch array $G_u=30.7$\,dBi.
-
-\textbf{Interference at Service Link.} Here the picture is different. A receiver at horizontal distance $r$ from the serving HAPS's nadir and the two interferers at $\approx$65~km produces an \textbf{angularly-dependent} SINR: at a fixed $r=50$\,km, SINR ranges from $-7.40$\,dB toward an interferer ($\theta=0^\circ$) to $+2.54$\,dB away from the constellation ($\theta=210^\circ$) -- a $9.94$\,dB spread -- mapping to a good sector ($\approx$120$^\circ$--290$^\circ$) and a bad sector ($\approx$330$^\circ$--75$^\circ$) (Fig.~\ref{fig:app-constellation-sectors}, Fig.~\ref{fig:multinode-interference}, \S\ref{sec:results}).
-
 % =====================================================================
 \section{Model Simulation and Results}
 \label{sec:results}
 % =====================================================================
 
-All results use a Python simulation stack (\texttt{NumPy}, \texttt{pandas}, \texttt{Matplotlib}); atmospheric and scintillation losses use the ITU-Rpy (\texttt{itur}) library's implementation of the relevant ITU-R recommendations.
+We simulate the closed-form models above using a Python simulation stack (\texttt{NumPy}, \texttt{pandas}, \texttt{Matplotlib}); atmospheric and scintillation losses use the ITU-Rpy (\texttt{itur}) library's implementation of the relevant ITU-R recommendations. Following are the results of this simulation:
 
 \subsection{Validating 38~GHz Choice Through Simulation}
 
@@ -308,21 +276,48 @@ This addresses a natural reader question: why not simply pick a lower-loss frequ
 \label{fig:atm_frequency_nominal}
 \end{figure}
 
-From Fig.~\ref{fig:atm_frequency_nominal} we can notice that gas absorption (ITU-R P.676~\cite{itu_p676}) has two resonance peaks to avoid; frequency selection should avoid these. We also need higher frequencies to allow higher data aggregation. Combining both constraints, ITU has prescribed the 38.0~GHz range for HAPS (WRC-19), which is the basis for the channel modeling in this paper.
+From Fig.~\ref{fig:atm_frequency_nominal} we can notice that gas absorption (ITU-R P.676~\cite{itu_p676}) has two resonance peaks to avoid; frequency selection should avoid these. We also need higher frequencies to allow higher data aggregation. 
+
+We also notice that at 38~GHz, both the fog/cloud and gas-absorption terms are small over the backhaul/feeder slant length: fog loss totals $<0.2$\,dB, and gas loss totals $\approx0.4$\,dB, since 38~GHz sits away from the gas-absorption resonance peaks.
+
+Considering these factors, we validate the choice of 38.0~GHz range for HAPS (WRC-19).
+
+\subsection{Analysing Rain Attenuation Through Simulation}
+
+The simulated model is based on Delhi,  the backhaul/feeder margin  is evaluated at Delhi's rain statistics (ITU-R P.837), consistent with the 15--25\,dB Ka-band rain margins ECC Report 156~\cite{ecc_report_156} reports for Fixed Satellite Service (FSS) links -- a fair comparison, since FSS margins are derived for point-to-point links between two fixed terminals, which is exactly the geometry of our backhaul (Gateway fixed at the HAPS triangle's centroid) and feeder (UAV fixed 0.1\,km from the serving HAPS's own nadir) links, both evaluated at a constant elevation rather than a moving one. 
+
+Link Margin which is the difference between the received signal strength and the atmospheric losses is evaluated as follows:
+\begin{itemize}
+  \item For 99.9\,\% availability, $R_{0.1}=15.7$\,mm/h, which gives $A_\mathrm{rain}\approx8.6$\,dB on the Gateway's centroid path, and $A_\mathrm{rain}\approx16.6$\,dB on the feeder's own near-zenith path.
+  \item Backhaul SINR (FSPL and co-channel interference only, no atmospheric loss) is $\approx+39.9$\,dB, as per Eq.~\eqref{eq:general-haps-sinr} evaluated with $P_h=43$\,dBm, $G_h=13.8$\,dBi, and Gateway receive gain $G_g=39.7$\,dBi~\cite{karaman2025haps}, with $\approx0.4$\,dB of additional gas loss. Resulting link margin: $39.9-8.6-0.4\approx30.9$\,dB at 99.9\,\% availability.
+  \item Feeder SINR (FSPL and co-channel interference only, no atmospheric loss) is $\approx+37.6$\,dB, as per Eq.~\eqref{eq:general-haps-sinr} evaluated with $P_h=43$\,dBm, $G_h=13.8$\,dBi, and UAV feeder-port receive gain $G_u=30.7$\,dBi~\cite{anim2021uav}, with $\approx0.4$\,dB of additional gas loss. Resulting link margin: $37.6-16.6-0.4\approx20.6$\,dB at 99.9\,\% availability.
+\end{itemize}
+ 
+This margin means link budget is sufficient to cover rain attenuation, even though the 38~GHz backhaul/feeder links are rain-dominated.
+
+
+\begin{figure}[H]\centering
+\includegraphics[width=0.95\columnwidth]{./figures/rain_attenuation_vs_distance.png}
+\caption{38~GHz backhaul rain attenuation vs.\ HAPS--Gateway horizontal distance (ITU-R P.838/P.618), grows faster than linear past $\approx$100\,km as elevation drops and the slant path lengthens (\S\ref{subsec:backhaul-model}).}
+\label{fig:rain-vs-distance}
+\end{figure}
+
+Though the backhaul/feeder links have sufficient margin to cover rain attenuation, the attenuation is still significant and time-varying, and is expected to become a greater concern if the number of UAVs is increased, since each additional UAV's feeder beam would then draw on the same HAPS transmit-power/capacity budget ($P_h$).
 
 \subsection{Analysing Multi-HAPS Interference Through Simulation}
 
-Simulating the interference model explained in \S\ref{sec:multihaps} resulted in a good/bad-sector split in the HAPS constellation, as shown in Fig.~\ref{fig:app-constellation-sectors}; this, along with the scintillation fade simulation (Eq.~\eqref{eq:scint_loss}), motivated placing the UAV relay near the serving HAPS's nadir in the current model. This helps in understanding how relay placement should synchronize with HAPS geometry, and motivates modeling each HAPS as simultaneously a serving node (near-nadir, low-loss, for its own users) and an interferer for the other two HAPS' users -- jointly optimizing positioning across both roles is left to future work (\S\ref{sec:roadmap}).
 
 \begin{figure}[H]\centering
-\includegraphics[width=0.85\columnwidth]{./figures/constellation_with_sectors.png}
+\includegraphics[width=0.68\columnwidth]{./figures/constellation_with_sectors.png}
 \caption{HAPS constellation geometry (65\,km equilateral triangle: S at origin, I1 at $0^\circ$, I2 at $60^\circ$) with spatial SINR sectors at $r=50$\,km. Good sector (green, $\sim$120--290$^\circ$) vs.\ bad sector (red, $\sim$330--75$^\circ$). Best $+2.54$\,dB at $210^\circ$; worst $-7.40$\,dB at $0^\circ$.}
 \label{fig:app-constellation-sectors}
 \end{figure}
 
 \label{sec:spatial-sinr}
 
-Further, through this simulation of multi-HAPS interference, we notice that SINR varies with angular position even at the same distance, under the influence of interferers. Specifically, at a fixed 50~km radius, SINR varies by up to 9.94\,dB with angular position (\S\ref{sec:multihaps}), in contrast to doubling the link distance, which costs only $\sim$2--3\,dB -- proving that angular position affects SINR more than distance does.
+Simulating the interference model explained in \S\ref{sec:multihaps} resulted in a good/bad-sector split in the HAPS constellation, as shown in Fig.~\ref{fig:app-constellation-sectors}; this, along with the scintillation fade simulation (Eq.~\eqref{eq:scint_loss}), motivated placing the UAV relay near the serving HAPS's nadir in the current model.
+
+This angular spread is substantial: at a fixed 50~km radius, SINR varies by up to 9.94\,dB with angular position (Fig.~\ref{fig:app-constellation-sectors}), versus only $\sim$2--3\,dB from doubling the link distance indicating that angular position affects SINR more than distance does.
 
 \begin{figure}[H]\centering
 \includegraphics[width=0.95\columnwidth]{./figures/figure5_multi_haps_sinr_mean.png}
@@ -332,61 +327,35 @@ Further, through this simulation of multi-HAPS interference, we notice that SINR
 
 \subsection{Analysing Relay Path Behaviour Through Simulation}
 
-\textbf{Relay Access Hop Fades Faster Than Service Link.} We observed that access hop (UAV$\to$UE, 2\,GHz) capacity drops with distance (Table~\ref{tab:uav-radial-sweep}), collapsing far faster than the direct HAPS$\to$UE link because of low elevation -- and so does LoS probability -- much sooner than a 20\,km-altitude HAPS does. The usable-relay radius, where access-hop capacity crosses a $0.5$\,bits/s/Hz floor, is $R_\mathrm{eff}\approx6.5$\,km in urban terrain and $\approx10.3$\,km in suburban terrain (Table~\ref{tab:uav-radial-sweep}), in accordance with building density per terrain defined in the Holis--Pechac LoS model of \S\ref{subsec:service-model}.
+Area-averaged capacity (bits/s/Hz) over disks of radius $R_\mathrm{eff}$ is the capacity considering no population or per-user sharing assumption (Monte Carlo average, $N=20{,}000$ uniform samples per disk).
+
+We can observe that access hop (UAV$\to$UE, 2\,GHz) capacity drops with distance, collapsing far faster than the direct HAPS$\to$UE link because of low elevation. This allows us to compute a usable relay radius where access-hop capacity crosses a $0.5$\,bits/s/Hz floor, which is $R_\mathrm{eff}\approx6.5$\,km in urban terrain and $\approx10.3$\,km in suburban terrain (\S\ref{subsec:service-model}).
+
+Within this effective radius the area-averaged capacity of different links is as in Table~\ref{tab:same-patch-ase}.
 
 \begin{minipage}{\columnwidth}
 \begin{center}
 \footnotesize
-\captionof{table}{End-to-end relay capacity $C_\mathrm{relay}=\min(C_\mathrm{haps-uav},C_\mathrm{uav-ue})$ vs.\ horizontal distance from the fixed UAV. The feeder hop caps capacity at $10.2$\,bits/s/Hz near the UAV; the access hop becomes the bottleneck past $\approx$0.5\,km and crosses the $0.5$\,bits/s/Hz usable floor at $R_\mathrm{eff}\approx6.5$\,km.}
-\label{tab:uav-radial-sweep}
-\begin{tabularx}{\columnwidth}{|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
-\hline
-\textbf{Distance from UAV (km)} & \textbf{Relay capacity (bits/s/Hz)} \\
-\hline
-0.0 & 10.20 (feeder-limited) \\
-\hline
-2.0 & 5.10 \\
-\hline
-4.0 & 1.67 \\
-\hline
-5.0 & 0.96 \\
-\hline
-6.0 & 0.61 \\
-\hline
-6.5 ($R_\mathrm{eff}$) & 0.50 \\
-\hline
-8.0 & 0.30 \\
-\hline
-10.0 & 0.17 \\
-\hline
-\end{tabularx}
-\end{center}
-\end{minipage}
-
-\vspace{6pt}
-
-\textbf{UAV Relay Has the Highest Capacity Within Its Coverage Area.} We observed that though the access hop fades faster, within the UAV's own minimal coverage area, the access hop delivers $3.6\times$ (urban) to $3.8\times$ (suburban) more capacity than the direct link alone. Table~\ref{tab:same-patch-ase} compares the area-averaged capacity over three same-size disks of radius $R_\mathrm{eff}$ per terrain (the usable-relay radius defined above, Table~\ref{tab:uav-radial-sweep}): the direct link centered at the HAPS's own nadir (column~1), the direct link centered at the UAV's actual fixed location (column~2), and the access hop centered at the UAV (column~3). The relay therefore provides substantially better coverage and spread locally, where the fixed UAV sits. A fleet of such UAVs would be needed to cover, via relay, the entire area that HAPS--UE service links already cover.
-
-\begin{minipage}{\columnwidth}
-\begin{center}
-\footnotesize
-\captionof{table}{Area-averaged capacity (bits/s/Hz) over disks of radius $R_\mathrm{eff}$, no population or per-user sharing assumption. Column~1: direct link, disk centered at the HAPS's own nadir (its single best-case location). Column~2: direct link, same-size disk centered at the UAV's actual fixed location instead. Column~3: access hop, disk centered at the UAV. Comparing columns 1~vs.~3 asks whether a 6.5--10.3\,km disk is better served by an (unrealizable) HAPS directly overhead or by the existing UAV relay; comparing columns 2~vs.~3 asks whether, given the UAV already sits where it sits, the relay helps the users already there.}
+\captionof{table}{Area-averaged capacity (bits/s/Hz) over disks of radius $R_\mathrm{eff}$}
 \label{tab:same-patch-ase}
 \begin{tabularx}{\columnwidth}{|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
 \hline
 \textbf{Landscape} & \textbf{$R_\mathrm{eff}$ (km)} & \textbf{Direct @ HAPS nadir} & \textbf{Direct @ UAV's area} & \textbf{Access hop @ UAV} \\
 \hline
-Urban & 6.50 & 2.60 & 0.56 & 2.03 \\
+Urban & 6.50 & 2.60 & 2.61 & 2.06 \\
 \hline
-Suburban & 10.30 & 2.52 & 0.58 & 2.20 \\
+Suburban & 10.31 & 2.52 & 2.52 & 2.19 \\
 \hline
 \end{tabularx}
 \end{center}
 \end{minipage}
 
-\vspace{6pt}
+\vspace{0.5em}
+With uniform population distribution, 100\,km radius HAPS coverage area and our 3-HAPS geometry, a single HAPS's direct-link population is $(100^2/3)$ and a UAV's relay population is $R_\mathrm{eff}^2$, giving a user ratio of 79:1 in urban terrain and 31:1 in suburban terrain. At the edge of $R_\mathrm{eff}$, the relay's raw capacity drops to $\approx0.50$\,bits/s/Hz in both terrains, versus the direct link's area-averaged $2.60$\,bits/s/Hz (urban) and $2.52$\,bits/s/Hz (suburban) from Table~\ref{tab:same-patch-ase}. Dividing by the population ratio, the relay's per-user share at the edge is $15\times$ better in urban terrain ($0.50$ vs.\ $2.60/79=0.033$) and $6\times$ better in suburban terrain ($0.50$ vs.\ $2.52/31=0.081$); closer to the UAV, the relay wins by more.
 
-The relay therefore helps only the fraction of users within $R_\mathrm{eff}$ of the one fixed UAV, not every user -- a single static platform cannot be close to everyone across a 100\,km-radius footprint; \S\ref{sec:roadmap} quantifies how many additional, well-placed UAVs this implies. This motivates including the UAV relay as an association option for the learned policy of \S\ref{sec:dqn}, which (\S\ref{sec:dqn-results}) learns to invoke it only for users it actually helps.
+Relay beats direct everywhere inside $R_\mathrm{eff}$.
+
+The relay therefore helps every user within $R_\mathrm{eff}$ of the one fixed UAV, not the whole footprint -- a single static platform cannot be close to everyone across a 100\,km-radius footprint; \S\ref{sec:roadmap} quantifies how many additional, well-placed UAVs this implies. This motivates including the UAV relay as an association option for the learned policy of \S\ref{sec:dqn}, which (\S\ref{sec:dqn-results}) learns to invoke it for users it helps.
 
 
 \subsection{Takeaway from Simulation Results}
@@ -408,7 +377,7 @@ A learned, real-time association policy can condition on all three jointly, whic
 \subsection{Baseline Association Policies}
 \label{sec:baseline-policies}
 
-As a control and basis for a learned policy, we evaluate three rule-based (non-learned) association policies on the above channel model. The choice for association for $N$ users is one of six options every hour: a direct link to HAPS1--3, or a UAV relay via HAPS1--3 (\S\ref{sec:relay-path-analysis}).
+As a control and basis for a learned policy, we evaluate three rule-based (non-learned) association policies on the above channel model. The choice for association for $N$ users is one of six options every hour: a direct link to HAPS1--3, or a UAV relay via HAPS1--3.
 
 \begin{itemize}\setlength{\itemsep}{1pt}
   \item \textbf{Random}: uniform-random choice among the six options each hour (sanity floor).
@@ -421,7 +390,7 @@ However it should be noted that Max-SINR needs evaluating the SINR of all three 
 \subsection{LSTM Rain-Attenuation Forecaster}
 \label{sec:lstm}
 
-We plan to forecast the dominant atmospheric parameter -- rain attenuation -- through an LSTM, as decided in \S\ref{subsec:backhaul-model}. We use the weather input from hourly NASA POWER, METAR and ERA5 data for Delhi over 2023--2026. The input consists of temperature, humidity, pressure, wind, precipitation, cloud amount, visibility, rain/fog codes, cloud liquid water, and sine/cosine encodings of time-of-day and season. The LSTM maps the past 24 hours of weather to the next six hourly values of HAPS-to-gateway rain attenuation at 38~GHz and $89.86^\circ$ elevation (HAPS nadir). A forecast for hour $t$ is issued at $t-1$ and evaluated strictly out-of-sample (e.g.\ 2026 forecasts come from a model trained only on 2023--2025 data), with early-stopping at the epoch with the best validation RMSE on held-out 2025 data to avoid overfitting.
+We plan to forecast the dominant atmospheric parameter -- rain attenuation -- through an LSTM, as decided in \S\ref{subsec:backhaul-model}. We use the weather input from hourly NASA POWER, METAR and ERA5 data for Delhi over 2023--2026. The input consists of temperature, humidity, pressure, wind, precipitation, cloud amount, visibility, rain/fog codes, cloud liquid water, and sine/cosine encodings of time-of-day and season. The LSTM maps the past 24 hours of weather to the next six hourly values of HAPS-to-gateway rain attenuation at 38~GHz and $27.995^\circ$ elevation (the Gateway is fixed at the HAPS triangle's centroid, 42.50\,km slant range from the serving HAPS). A forecast for hour $t$ is issued at $t-1$ and evaluated strictly out-of-sample (e.g.\ 2026 forecasts come from a model trained only on 2023--2025 data), with early-stopping at the epoch with the best validation RMSE on held-out 2025 data to avoid overfitting.
 
 The result of the LSTM run, depicted in Fig.~\ref{fig:lstm-2026} and compared against persistence in Table~\ref{tab:lstm-2026}, shows that the LSTM predicts rain attenuation with lower RMSE than the persistence baseline at every horizon except $+1$\,h, where persistence has lower RMSE; at $+2$\,h persistence also has a narrowly lower MAE.
 
@@ -464,13 +433,27 @@ We choose DRL with a DQN to make the best association decision for HAPS. The fol
 
 \subsubsection{MDP Formulation}
 
-\textbf{Number of MDPs.} With $N$ users, a centralized Markov Decision Process (MDP) over joint assignments is intractable, so the problem decomposes into per-user MDPs: each user independently chooses a platform, and reward is computed after all assignments.
+\textbf{Number of MDPs.} The association problem decomposes into two MDPs, not one, both solved by the same DQN.
 
-With a single, static relay UAV (Table~\ref{tab:config}), choosing \emph{which} HAPS feeds the UAV's feeder hop is folded into this same per-user action set, effectively treating the UAV as if it were just another user requesting a serving HAPS. We note that sharing the HAPS platform selection, but using a different 38~GHz channel model, is a fair simplification when there is only one UAV to assign. If we instead consider a fleet of UAVs, UAV-to-HAPS assignment becomes an $O(\text{fleet size})$ problem (e.g.\ the $\sim$200-UAV deployment of \S\ref{sec:roadmap}), and hence UE-to-HAPS assignment, an $O(N)$ problem, becomes a separably-sized assignment problem that needs its own MDP. However, it is out of scope for this paper, which is limited to a single static UAV.
+\emph{(1) An $N$-user MDP, for service/access-link association.} With $N$ users, a centralized MDP over joint assignments is intractable, so each user independently chooses a platform every hour, and reward is computed after all assignments.
 
-\textbf{MDP Parameters.} Each of the three HAPS platforms can serve a user directly or through the UAV relay, giving six actions $a_k\in\{0,\dots,5\}$ (actions 0--2: direct HAPS1--3; actions 3--5: UAV relay via HAPS1--3).
+\emph{(2) An $M$-UAV MDP ($M=1$ here), for feeder-link association.} The single, static relay UAV (Table~\ref{tab:config}) has one physical feeder radio, so which HAPS feeds it is a separate, per-UAV, per-hour decision, shared by every user who relays that hour -- not something any one user's own action can set. A fleet of $M$ UAVs would turn this into an $M$-UAV assignment problem (e.g.\ the $\sim$200-UAV deployment of \S\ref{sec:roadmap}); here $M=1$, so there is exactly one such decision per hour.
 
-\textbf{State} (per user, 21-dimensional): SINR to each platform (dB, Eq.~\eqref{eq:sinr}), horizontal distance to each (km), each HAPS's battery state of charge (\%, \S\ref{subsec:battery}), the UAV-relay capacity to each platform (bits/s/Hz, \S\ref{sec:relay-path-analysis}), rainfall rate, visibility, time-of-day, and the six LSTM rain forecasts $\hat{A}_t,\dots,\hat{A}_{t+5}$ (\S\ref{sec:lstm}), issued at $t-1$ so no rain of hour $t$ enters the state. All six forecast horizons are included even though the forecast's accuracy gain over persistence is not uniform across them, since the longer horizons matter most for pre-emptive rerouting. Tropospheric scintillation (\S\ref{subsec:backhaul-model}) is not included as a state feature -- it is a smaller, time-varying effect ($\le$0.6\,dB at 38~GHz, $p=1\,\%$) whose forecasting is left to future work.
+At each hour, the same DQN first chooses every user's action for the $N$-user MDP, then takes one extra forward pass on that hour's mean user state to greedily pick the feeder HAPS for the $M$-UAV MDP. Both choices are trained off the same replay buffer and repeat every hour across the episode. This single global mean does not scale to $M>1$ UAVs without a per-UAV context; nevertheless, it works for the current single-UAV geometry.
+
+\textbf{MDP Parameters.} Each of the three HAPS platforms can serve a user directly, giving six actions $a_k\in\{0,\dots,5\}$ (actions 0--2: direct HAPS1--3; actions 3--5: relay via the UAV). The HAPS sub-index of a relay action is not used -- which HAPS the UAV's feeder actually binds to is decided separately, as above.
+
+\textbf{State} (per user, 21-dimensional):
+\begin{enumerate}\setlength{\itemsep}{1pt}
+  \item SINR to each of the 3 platforms (dB, Eq.~\eqref{eq:sinr}) -- 3 dims
+  \item horizontal distance to each of the 3 platforms (km) -- 3 dims
+  \item each HAPS's battery state of charge (\%, \S\ref{subsec:battery}) -- 3 dims
+  \item rainfall rate -- 1 dim
+  \item visibility -- 1 dim
+  \item time-of-day -- 1 dim
+  \item UAV-relay capacity to each of the 3 platforms (bits/s/Hz) -- 3 dims
+  \item the six LSTM rain forecasts $\hat{A}_t,\dots,\hat{A}_{t+5}$ (\S\ref{sec:lstm}), issued at $t-1$ so no rain of hour $t$ enters the state -- 6 dims
+\end{enumerate}
 
 \textbf{Reward and Penalty.} For user $k$ with linear SINR $\gamma_k=10^{\mathrm{SINR}_{k,\mathrm{dB}}/10}$ on its chosen link,
 \begin{align}
@@ -498,37 +481,41 @@ giving $P_\mathrm{solar}(t)=20\,\mathrm{m}^2\times0.20\times I_0(t)$, i.e.\ $240
 \subsection{DQN Results}
 \label{sec:dqn-results}
 
-The three baseline policies of \S\ref{sec:baseline-policies} -- random, max-SINR, and max-throughput -- are now compared against the LSTM+DQN agent of \S\ref{sec:dqn} on the same held-out days and six-action set. The DQN is a custom PyTorch network, built with \texttt{torch} and \texttt{torch.nn}. It is trained on 2400 rolling 24-hour episodes, cycling the 400 real 2024 episodes six times, and evaluated on 50 held-out 2025 days across ten experiments with different random seeds.
+\begin{itemize}\setlength{\itemsep}{1pt}
+  \item \textbf{Baselines.} Random, max-SINR, and max-throughput (\S\ref{sec:baseline-policies}) vs.\ the LSTM+DQN agent (\S\ref{sec:dqn}), all on the same held-out days and six-action set.
+  \item \textbf{Implementation.} Custom PyTorch network (\texttt{torch}, \texttt{torch.nn}).
+  \item \textbf{Input data.} 400 real 2024 episodes (weather-conditioned, \S\ref{sec:lstm}).
+  \item \textbf{Training.} Rolling 24-hour episodes; 2400 episodes total, cycling the 400 real 2024 episodes six times.
+  \item \textbf{Validation.} 50 held-out 2025 days, across ten seeded experiments with different random seeds.
+  \item \textbf{Variants run.} Four policies (random, max-SINR, max-throughput, LSTM+DQN) plus three forecast ablations of the DQN itself (\texttt{lstm}, \texttt{none}, \texttt{oracle}), each under the same ten-seed protocol.
+\end{itemize}
 
 \begin{table}[H]
 \centering
 \caption{Policy comparison, 50 held-out 2025 days, mean over ten experiments (std.\ dev.\ across experiments in parentheses). Jain is over per-user delivered throughput.}
 \label{tab:dqn-all-policies}
-{\scriptsize\setlength{\tabcolsep}{3pt}
-\begin{tabularx}{\columnwidth}{|>{\raggedright\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
+{\footnotesize\setlength{\tabcolsep}{4pt}\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\columnwidth}{|>{\raggedright\arraybackslash}p{0.30\columnwidth}|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|>{\centering\arraybackslash}X|}
 \hline
 \textbf{Policy} & \textbf{Reward/step} & \textbf{Jain} & \textbf{Outage/50} \\
 \hline
-Random (six actions) & $-91.9\,(1.5)$ & $0.262\,(0.005)$ & $41.5\,(0.3)$ \\
+Random (six actions) & $-92.2\,(1.4)$ & $0.255\,(0.011)$ & $41.6\,(0.3)$ \\
 \hline
-Max-SINR (direct only) & $-13.8\,(1.7)$ & $\mathbf{0.865}\,(0.002)$ & $0.8\,(0.2)$ \\
+Max-SINR (direct only) & $-14.5\,(1.7)$ & $\mathbf{0.558}\,(0.013)$ & $\mathbf{0.8}\,(0.2)$ \\
 \hline
-Max-throughput (six actions) & $\mathbf{-13.5}\,(1.6)$ & $0.862\,(0.002)$ & $\mathbf{0.7}\,(0.2)$ \\
+Max-throughput (six actions) & $\mathbf{-14.6}\,(1.7)$ & $0.241\,(0.039)$ & $\mathbf{0.8}\,(0.2)$ \\
 \hline
-LSTM + DQN & $-14.6\,(1.8)$ & $0.857\,(0.005)$ & $1.3\,(0.4)$ \\
+LSTM + DQN & $-15.1\,(1.7)$ & $0.351\,(0.112)$ & $1.2\,(0.2)$ \\
 \hline
 \end{tabularx}}
 \end{table}
 
-LSTM+DQN is slightly behind the max-SINR and max-throughput baselines as mentioned in Table~\ref{tab:dqn-all-policies}. However, the baselines,
-\begin{itemize}
-  \item Max-SINR needs a real-time SINR measurement of all three HAPS platforms prior to assignment, which becomes overwhelming if done periodically during operational times.
-  \item Max-throughput additionally compares all six options' instantaneous capacity, including relay, but this needs perfect, instantaneous knowledge of capacities it cannot actually measure in real time.
-\end{itemize}
-And this makes the DQN's learned policy the only viable option.
-The DQN in the current model invokes relay specifically for users whose best direct SINR  averages $-1.9$\,dB when the population mean is $+2.4$\,dB. However practically we need to use a fleet of UAVs to cover the entire 100\,km footprint, and the DQN's learned policy is expected to generalize to that case, which is left to future work (\S\ref{sec:roadmap}).
+LSTM+DQN is slightly behind the max-SINR and max-throughput baselines on reward and outage (Table~\ref{tab:dqn-all-policies}), but fairer than max-throughput (Jain $0.351$ vs.\ $0.241$, higher on 8 of 10 seeds, $p=0.0153$) and less fair than max-SINR ($0.558$, every seed, $p=0.0003$).
 
 \FloatBarrier
+Figs.~\ref{fig:seed-stats} and~\ref{fig:paired-forest} present these as seeded-experiment results: the same ten-seed, 2400-episode training/evaluation protocol repeated independently ten times, not a single run, so that the spread shown is run-to-run robustness rather than one-off variance.
+
+\vspace{0.5em}
 \begin{minipage}{\columnwidth}
 \begin{center}
 \includegraphics[width=\linewidth]{./figures/seed_stats.png}
@@ -543,7 +530,7 @@ Fig.~\ref{fig:seed-stats} reports reward, Jain fairness, outage, and battery SoC
 
 \begin{minipage}{\columnwidth}
 \begin{center}
-\includegraphics[width=\linewidth]{./figures/paired_forest.png}
+\includegraphics[width=0.8\linewidth]{./figures/paired_forest.png}
 \captionof{figure}{Paired differences, LSTM+DQN minus baseline, per experiment (50 days, ten seeds); whiskers crossing zero are not significant.}
 \label{fig:paired-forest}
 \end{center}
@@ -551,37 +538,29 @@ Fig.~\ref{fig:seed-stats} reports reward, Jain fairness, outage, and battery SoC
 
 \vspace{6pt}
 
-Fig.~\ref{fig:paired-forest} gives the paired differences and per-seed significance against each baseline. The DQN loses to both rule-based policies on reward, fairness, and outage on every seed (or all but one), and ties them only on battery management.
-
-\textbf{Does the rain forecast help the DQN itself?} A forecast ablation, trained and evaluated with this same ten-seed, 2400-episode protocol (\texttt{lstm} vs.\ a \texttt{none} variant with the six rain-forecast features zeroed, and an \texttt{oracle} variant given the true future attenuation) finds \texttt{lstm}, \texttt{none}, and \texttt{oracle} statistically indistinguishable from each other on reward, fairness, and outage (all $p>0.1$) -- both links are already well-margined against rain at this single-UAV scale (\S\ref{subsec:backhaul-model}). \S\ref{sec:discussion} discusses why this null result does not diminish rain's importance, particularly for fleet-scale decision-making.
+\textbf{Summary of DQN results.}
+\begin{itemize}\setlength{\itemsep}{2pt}
+  \item \emph{Vs.\ baselines.} LSTM+DQN trails max-SINR and max-throughput on reward and outage on every seed; it is fairer than max-throughput on 8/10 seeds ($p=0.0153$) but less fair than max-SINR on every seed ($p=0.0003$).
+  \item \emph{Operational cost of the baselines.} Max-SINR and max-throughput both need continuous, perfect, zero-latency measurement of every platform's SINR or capacity from every UE, an idealized assumption rather than something a real UE can actually provide; the DQN uses only its own locally available state.
+  \item \emph{Impact of rain forecast.} Rain does not impact runs on this geometry, where the 2\,GHz access link and the margin-supported 38\,GHz feeder link both absorb it without needing to anticipate it. The forecaster's behaviour against persistence is nonetheless a useful input for more complex geometries where margins no longer absorb rain's losses and a forecast would actually matter.
+  \item \emph{Deployability.} The DQN is the option that allows dynamic switching of links based on practical, learned-from-past-data behaviour, rather than the instantaneous, impractical periodic measurement of all available links that max-SINR and max-throughput require; at scale, with a UAV fleet covering the full 100\,km footprint (\S\ref{sec:roadmap}), the DQN becomes the inevitable option.
+\end{itemize}
 % =====================================================================
-\section{Discussion and Future Work}
-\label{sec:discussion-future}
-% =====================================================================
-
-\subsection{Discussion}
-\label{sec:discussion}
-
-The comparison in Table~\ref{tab:dqn-all-policies} and Fig.~\ref{fig:paired-forest} should be read precisely: the LSTM-fed DQN does not outperform max-SINR or max-throughput on reward, fairness, or outage -- it is measurably, if narrowly, behind both on every seed (or all but one), and ties them only on battery management. What it offers instead is near-oracle performance without oracle information. Max-SINR needs a real-time SINR measurement of all three HAPS platforms before every hourly decision; max-throughput needs the same for all six options, including the relay hop's actual capacity -- both assume continuous, perfect, zero-latency global measurement that a real HAPS network cannot operationally sustain. The DQN uses only its own locally available state (SINR to platforms, battery, rain forecast) and still lands within $\approx$1\,dB of reward and $\approx$1 outage per 50 users of these unrealizable upper bounds, while being the only one of the four policies that is both actually deployable and that retains and selectively invokes the relay path -- as a targeted fallback for users already near the outage threshold (averaging $-1.9$\,dB best-direct-SINR against a $+2.4$\,dB population mean), not indiscriminately.
-
-Rain was the impairment worth building a forecaster for in the first place because it is the dominant consumer of the backhaul's dB budget -- $\approx$19\,dB out of the $\approx$38\,dB clear-sky SINR (\S\ref{subsec:backhaul-model}), an order of magnitude more than fog or scintillation combined. Understanding how that largest term can be anticipated and handled remains the right question even though, at this model's current single-gateway, single-UAV scale, the answer turns out to be that it does not change the association decision: the forecast ablation (\S\ref{sec:dqn-results}) shows the LSTM rain forecast provides no measurable benefit to the trained policy. This is a genuine null result, not a shortcoming to minimize: both the 38\,GHz feeder/backhaul link and the 2\,GHz service/access links are already well-margined against rain in this topology, so there is no fade left for the agent to usefully anticipate. Whether that remains true at fleet scale, where a UAV's relay choice could shift feeder-hop load across platforms with different weather exposure, is an open question (\S\ref{sec:roadmap}).
-
-The Gateway's near-nadir siting under the serving HAPS (Table~\ref{tab:config}, \S\ref{sec:topology}) is valid specifically because this model has a single, fixed serving HAPS with no role-switching among the three platforms. A real HAPS is not perfectly station-keeping and the serving role could in principle rotate between platforms over time; a ground gateway, being fixed, cannot continuously track a moving or switching HAPS's nadir the way a mobile platform can. Were role-switching introduced, the Gateway would be better sited at the constellation's centroid -- equidistant from all three HAPS, the same placement logic already used for the UAV relay (\S\ref{sec:relay-path-analysis}) -- rather than near-nadir under one specific platform. That change would also put concurrent backhaul traffic from multiple HAPS through the same ground site, at which point orthogonal frequency allocation or modulation planning across the three feeder/backhaul hops becomes necessary to avoid cross-interference between them. We leave this for future work and continue with the current single-serving-HAPS, near-nadir-Gateway model in this paper.
-
-\subsection{Future Work}
+\section{Future Work}
 \label{sec:roadmap}
+% =====================================================================
 
-\textbf{1) Model multiple UAVs.} This paper already shows relaying is worthwhile mainly within $\approx$6.5\,km of its single UAV. To achieve full, gap-free coverage of the 100\,km service radius, we need $\sim$200--270 such UAVs, and with that a number of new problems to solve:
+\textbf{1) Model multiple UAVs.} The single, near-nadir UAV only covers its own $R_\mathrm{eff}$ disk (\S\ref{sec:results}), not the full footprint; gap-free coverage of the 100\,km service radius needs $\sim$200--270 such UAVs. This raises several new problems to solve:
 \begin{itemize}\setlength{\itemsep}{1pt}
-  \item \emph{UAV positioning.} Positioning UAVs to maximise coverage with the best SINR, letting each UAV's altitude and horizontal distance adapt to user locations and to its distance from the serving HAPS, rather than fixing both as in this paper's static, centroid-placed single-relay model.
-  \item \emph{UAV-HAPS association.} Associating the UAV$\to$HAPS link for $N$ UAVs and $M$ HAPS platforms.
-  \item \emph{Cross-UAV interference and relative motion.} A point-sampled check (placing a single relay, in isolation, at distances from 5--95\,km from the serving HAPS, with a user immediately beside it each time) suggests its local advantage over the direct link grows with distance from nadir -- but this ignores the co-channel interference a real fleet of UAVs would create for each other, and the static geometry assumed throughout this paper. A fleet-scale model needs to add a UAV-to-UAV interference term to Eq.~\eqref{eq:general-haps-sinr} and address relative motion of HAPS platforms and UAVs, modeling movement of both relative to each other and to users, before this isolated-UAV trend can be treated as a general result.
+  \item \emph{UAV positioning.} Future work should let each UAV's altitude and horizontal distance adapt to user locations and to its distance from the serving HAPS, instead of the static, near-nadir placement used here.
+  \item \emph{UAV-HAPS association.} The single-UAV, per-hour feeder-HAPS decision used here (\S\ref{sec:dqn}) should extend to $N$ UAVs and $M$ HAPS platforms, with feeder capacity contended across UAVs under the same HAPS.
+  \item \emph{Cross-UAV interference and relative motion.} A fleet-scale model should add a UAV-to-UAV interference term to Eq.~\eqref{eq:general-haps-sinr} and model relative motion between HAPS platforms, UAVs, and users.
 \end{itemize}
 
-\textbf{2) LSTM improvements.} We have already concluded that rain forecasting does not help the current single-UAV model (\S\ref{sec:dqn-results}), but with a fleet of UAVs the picture may change.
+\textbf{2) LSTM and DQN improvements.} The forecast only pays off once a fleet lets several UAVs share one HAPS's feeder capacity, since only then can a forecast let the policy stagger reassignments ahead of a shared fade (\S\ref{sec:dqn-results}). Three directions follow from this:
 \begin{itemize}\setlength{\itemsep}{1pt}
-  \item \emph{Other impairments.} Fog liquid water content, scintillation structure constants, and gas absorption are computed instantaneously from climatology in this work (ITU-R P.840/P.618/P.676), not analysed as time series; if we do, these are worth forecasting too.
-  \item \emph{Architectures.} If pursued, consider a ConvLSTM on gridded reanalysis data, or a spatio-temporal graph model such as DCRNN, T-GCN or Graph WaveNet if future sites are irregularly placed.
+  \item \emph{Other impairments.} Future work should forecast fog liquid water content, scintillation, and gas absorption as time series, instead of treating them as instantaneous climatology values as done here.
+  \item \emph{Feeder-context representation.} The DQN's feeder-HAPS choice should condition on a per-UAV, physically grounded representation of that UAV's own feeder channel, rather than the single global mean user state used here.
 \end{itemize}
 
 \textbf{3) Dynamic topology and geometry.}
@@ -606,27 +585,10 @@ train a DQN agent for user-platform association (\S\ref{sec:dqn-results}).
 
 \paragraph{Channel model.} As we note in \S\ref{sec:spatial-sinr}, SINR varies with angular position more than it does with distance. This spatial SINR heterogeneity -- non-uniformity of SINR at the same distance in different directions, dominates service-link quality. A closed-form max-SINR or max-throughput rule implicitly assumes SINR is a smooth, monotonic function of one variable (distance), which this heterogeneity violates (\S\ref{sec:motivation-learning}). A learned policy that conditions on full state (SINR to all platforms, battery, rain forecast) is required to achieve reliability and avoid outage.
 
-\paragraph{Relay path analysis.} The relay route, HAPS$\rightarrow$UAV$\rightarrow$UE
-(\S\ref{sec:relay-path-analysis}), is governed by its access hop (UAV$\rightarrow$UE),
-which weakens with user-UAV distance; within an effective radius around the UAV,
-the relay's per-user capacity exceeds that of the direct service link
-(\S\ref{sec:results}). With both links available, the DQN association agent
-(\S\ref{sec:dqn}, \S\ref{sec:dqn-results}) learns to invoke the relay only for
-users it actually helps. Covering the entire coverage area of the HAPS
-constellation at this quality requires a fleet of UAVs, and the resulting
-placement and role-sharing implications are left to future work
-(\S\ref{sec:roadmap}).
+\paragraph{Choice of learning.} Max-SINR and max-throughput need continuous, perfect, zero-latency measurement of every platform's SINR or capacity from every UE; the DQN uses only its own locally available, learned-from-past-data state, trailing both narrowly on reward and outage -- the only one of the three policies that is actually deployable.
 
-\paragraph{Learned association.} The LSTM-fed DQN agent (\S\ref{sec:dqn-results}) is
-measurably, if narrowly, behind the max-SINR and max-throughput baselines on reward,
-fairness, and outage, and ties them only on battery management. What it offers
-instead is near-oracle performance in the absence of required information for the oracle: unlike the
-baselines, it does not require continuous, perfect, zero-latency measurement of
-every platform's SINR or capacity. It is the only one of the three that is
-actually deployable, selectively invoking the one of the relay or service-link options as required.
-(\S\ref{sec:discussion}).
+\paragraph{Path selection through learned associations.} Within an effective radius around the UAV, the relay route's per-user capacity exceeds that of the direct service link (\S\ref{sec:results}), and the LSTM-fed DQN association agent (\S\ref{sec:dqn}, \S\ref{sec:dqn-results}) learns to invoke the relay only for users within that radius, where it outperforms the direct link.
 
-\section{References}
 \input{./bibliography.tex}
 
 \EOD

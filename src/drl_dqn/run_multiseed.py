@@ -30,7 +30,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from dqn_agent import DQNAgent  # noqa: E402
 from real_episode_env import RealEpisodeEnv, load_episodes  # noqa: E402
-from train_dqn_real import MAX_STEPS, max_sinr_policy, random_policy, run_episode  # noqa: E402
+from train_dqn_real import (MAX_STEPS, greedy_throughput_policy, max_sinr_policy,  # noqa: E402
+                            random_policy, run_episode)
 
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 OUT_DIR = os.path.join(ROOT, "data", "processed", "dqn_multiseed")
@@ -54,9 +55,16 @@ def train_dqn(seed: int, train_eps, device: str) -> DQNAgent:
         s = env.reset()
         for _ in range(MAX_STEPS):
             actions = agent.act_batch(s)
-            s2, r, done, _ = env.step(actions)
+            feeder_ctx = s.mean(axis=0)
+            feeder_raw = agent.act(feeder_ctx)
+            feeder_choice = feeder_raw % env.n_haps
+            s2, r, done, _ = env.step(actions, feeder_choice=feeder_choice)
+            feeder_ctx2 = s2.mean(axis=0)
             for k in range(env.n_users):
                 agent.remember(s[k], actions[k], r[k], s2[k], done)
+            # Same shared network/buffer also learns the per-UAV feeder-HAPS choice,
+            # off the step-level (mean) reward -- see haps_association_env.step().
+            agent.remember(feeder_ctx, feeder_raw, float(r.mean()), feeder_ctx2, done)
             agent.train_step()
             s = s2
         agent.decay_eps()
@@ -64,14 +72,14 @@ def train_dqn(seed: int, train_eps, device: str) -> DQNAgent:
     return agent
 
 
-def evaluate(eval_eps, name: str, seed: int, policy_factory) -> list[dict]:
+def evaluate(eval_eps, name: str, seed: int, policy_factory, agent=None) -> list[dict]:
     # random_policy draws from the global NumPy RNG; reseed it so every evaluation is
     # reproducible and independent of what ran earlier in the process.
     np.random.seed(seed + 1000)
     env = RealEpisodeEnv(eval_eps, seed=seed + 1000)
     rows = []
     for _ in range(len(eval_eps)):
-        m = run_episode(env, policy_factory())
+        m = run_episode(env, policy_factory(), agent=agent)
         m.update({"seed": seed, "policy": name, "episode_id": env.episode_id, "regime": env.regime})
         rows.append(m)
     return rows
@@ -97,8 +105,9 @@ def main() -> None:
         def dqn_policy(agent=agent):
             return lambda env, s: agent.act_batch(s)
 
-        rows += evaluate(eval_eps, "DQN with LSTM", seed, dqn_policy)
+        rows += evaluate(eval_eps, "DQN with LSTM", seed, dqn_policy, agent=agent)
         rows += evaluate(eval_eps, "max-SINR", seed, lambda: max_sinr_policy)
+        rows += evaluate(eval_eps, "max-throughput", seed, lambda: greedy_throughput_policy)
         rows += evaluate(eval_eps, "random", seed, lambda: random_policy)
         last = pd.DataFrame(rows)
         last = last[last["seed"] == seed]
@@ -121,16 +130,17 @@ def main() -> None:
     stat_df.to_csv(os.path.join(OUT_DIR, "stats.csv"), index=False, float_format="%.4f")
 
     dqn = per_seed[per_seed.policy == "DQN with LSTM"].set_index("seed")
-    mx = per_seed[per_seed.policy == "max-SINR"].set_index("seed")
     paired_rows = []
-    for m in METRICS:
-        d = (dqn[m] - mx[m]).values
-        lo, hi = ci95(d)
-        t_p = stats.ttest_1samp(d, 0.0).pvalue
-        paired_rows.append({"metric": m, "mean_diff_dqn_minus_maxsinr": d.mean(),
-                            "ci95_low": lo, "ci95_high": hi, "p_value_t_test": t_p,
-                            "dqn_better_seeds": int(np.sum(d > 0)) if m in ("reward_per_step", "jain", "soc")
-                            else int(np.sum(d < 0))})
+    for baseline_name in ("max-SINR", "max-throughput"):
+        bl = per_seed[per_seed.policy == baseline_name].set_index("seed")
+        for m in METRICS:
+            d = (dqn[m] - bl[m]).values
+            lo, hi = ci95(d)
+            t_p = stats.ttest_1samp(d, 0.0).pvalue
+            paired_rows.append({"baseline": baseline_name, "metric": m, "mean_diff_dqn_minus_baseline": d.mean(),
+                                "ci95_low": lo, "ci95_high": hi, "p_value_t_test": t_p,
+                                "dqn_better_seeds": int(np.sum(d > 0)) if m in ("reward_per_step", "jain", "soc")
+                                else int(np.sum(d < 0))})
     paired_df = pd.DataFrame(paired_rows)
     paired_df.to_csv(os.path.join(OUT_DIR, "paired.csv"), index=False, float_format="%.4f")
 

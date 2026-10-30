@@ -34,26 +34,48 @@ paper's "Phase 2: DRL for User Association" section (HAPS_AI_HW_ChannelModel.tex
     per HAPS from the aggregate load of its currently-associated users
     (direct or relay -- both draw from the serving HAPS's battery).
 
-Relay design (HAPS -> Gateway -> UE): each HAPS has one Gateway, colocated at
-its ground nadir point (matching the short feeder-distance convention used in
-src/generators/generate_pathloss_table.py and generate_relay_table.py), so the
-existing per-user/per-HAPS horizontal distance is reused directly as the
-Gateway->UE access-hop distance. End-to-end relay capacity is
-decode-and-forward, C_relay = min(C_feeder, C_access), via
+Relay design (HAPS -> Gateway -> UE): there is one physical Gateway for the
+whole constellation, whose placement is read from config/geometry.json via
+geometry_config.compute_placement('gateway') (default, static_gw branch:
+fixed at the HAPS triangle's centroid, matching generate_relay_table.py's
+fix) -- a constant slant range/elevation from any of the three HAPS
+(RELAY_FEEDER_DIST_KM/ELEVATION_DEG above, or self.relay_feeder_dist_km/
+elevation_deg for a non-default constellation spacing), not the per-user/
+per-HAPS horizontal distance the (older) near-nadir convention used. The
+Gateway->UE access-hop distance still reuses the existing per-user/per-HAPS
+horizontal distance (the Gateway relays on behalf of whichever HAPS serves
+the user, regardless of its own fixed location). End-to-end relay capacity
+is decode-and-forward, C_relay = min(C_feeder, C_access), via
 channel_model.relay_two_hop_capacity_bps_hz().
 
-Relay design (HAPS -> UAV -> UE): each HAPS can also serve a user via a
-relaying UAV hovering near that user's location (horizontal distance from the
-serving HAPS reused directly as the UAV's HAPS-relative position, matching
-generate_pathloss_table.py's "Relay (HAPS->UAV)" sweep convention). Hop 1
-(HAPS->UAV, 38 GHz) reuses the feeder-style scintillation model; Hop 2
-(UAV->UE, 2 GHz) reuses the landscape-dependent LoS/NLoS UAV access model.
-End-to-end capacity is again decode-and-forward via
-channel_model.uav_relay_two_hop_capacity_bps_hz(). This is the paper's
-previously-unmodeled User -> UAV -> HAPS relay tier, now added as a routing
-decision (an alternative path to the serving HAPS) rather than as a cascaded
-amplification gain within a single SINR equation -- see channel_model.py's
-module docstring ("NOT MODELED" / "MODELED" notes).
+Relay design (HAPS -> UAV -> UE), static_gw branch: a single static relay
+UAV (Table 1: count=1, no mobility) hovers at a short 0.1 km horizontal
+offset from the SERVING HAPS's own nadir, along the "good sector" azimuth
+(Fig. 6's spatial-SINR sector diagram) -- the mirror of the Gateway, which
+now takes the UAV's old centroid spot. Hop 1 (HAPS->UAV, 38 GHz) reuses the
+feeder-style scintillation model (near-zenith, ~89.7 deg, when relaying
+through the serving HAPS); Hop 2 (UAV->UE, 2 GHz) reuses the
+landscape-dependent LoS/NLoS UAV access model, using each user's real
+distance to this one fixed point. End-to-end capacity is again
+decode-and-forward via channel_model.uav_relay_two_hop_capacity_bps_hz().
+This is the paper's previously-unmodeled User -> UAV -> HAPS relay tier,
+added as a routing decision (an alternative path to the serving HAPS)
+rather than as a cascaded amplification gain within a single SINR equation
+-- see channel_model.py's module docstring ("NOT MODELED" / "MODELED"
+notes).
+
+Feeder-HAPS choice is per-UAV, not per-user: there is one physical UAV with one feeder
+radio, so "which HAPS feeds it this hour" is a single, shared decision, not something
+each relay-choosing user can independently set via its own action's HAPS sub-index.
+step()'s `feeder_choice` argument carries that decision in; every user who picks the
+UAV-relay action that hour shares the resulting feeder link's capacity (split equally,
+then re-bottlenecked per user against that user's own access-hop capacity). If
+`feeder_choice` is omitted, it falls back to a majority vote among that hour's
+relay-choosing users' own actions -- fine for the rule-based baselines, which have no
+separate feeder policy, but the DQN training/eval loops should pass an explicit choice
+(see train_dqn_real.py/run_ablations.py/run_multiseed.py) made by the same shared
+network, evaluated on a step-level feeder-context state, so the feeder decision is
+learned rather than inferred from whatever users happened to pick.
 
 Unlike haps_env.py (a different, unrelated 1-HAPS/3-mobile-UAV MDP), users
 and HAPS are both static within an episode, so each user's raw SINR to each
@@ -74,7 +96,9 @@ for _p in (_THIS_DIR, _MODELS_DIR):
 
 import numpy as np
 import channel_model as cm
-from battery_model import HAPSBatteryModel, feeder_link_rain_effect_on_capacity
+from battery_model import (HAPSBatteryModel, feeder_link_rain_effect_on_capacity,
+                            uav_feeder_rain_effect_on_capacity)
+from geometry_config import compute_placement, node_xy_km
 from reward_function import compute_aggregate_throughput, compute_jain_fairness_index
 
 NODE_KEYS = ["serving", "interferer1", "interferer2"]  # HAPS 0, 1, 2
@@ -86,13 +110,17 @@ RAIN_MM_H_MAX = 50.0
 VIS_M_MAX = 10_000.0
 CAPACITY_BPS_HZ_MAX = 20.0  # normalisation bound for relay capacity features
 
-# Fixed feeder-hop geometry for the Gateway relay path: the Gateway is
-# colocated near each HAPS's ground nadir point, matching the short
-# feeder-distance convention in generate_pathloss_table.py /
-# generate_relay_table.py, so elevation is close to 90 deg regardless of the
-# (short) horizontal offset.
-RELAY_FEEDER_DIST_KM = 0.1
-RELAY_FEEDER_ELEVATION_DEG = 89.0
+# Gateway placement, from config/geometry.json (see
+# src/models/geometry_config.py; defaults to today's static_gw geometry --
+# the single physical Gateway fixed at the HAPS triangle's centroid, not
+# co-located under each HAPS -- if that file doesn't exist yet). For the
+# default 65 km equilateral triangle this is a constant 42.50 km slant
+# range at 28.00 deg elevation from any of the three HAPS (circumradius =
+# spacing/sqrt(3), HAPS alt 20 km, Gateway alt 50 m). Computed once here at
+# the default 65 km spacing; __init__ recomputes it against self.spacing_km
+# when a non-default constellation spacing is requested.
+RELAY_FEEDER_DIST_KM = compute_placement('gateway')['slant_km']
+RELAY_FEEDER_ELEVATION_DEG = compute_placement('gateway')['elevation_deg']
 
 
 class HAPSAssociationEnv:
@@ -108,6 +136,13 @@ class HAPSAssociationEnv:
                  degraded_threshold_db=0.0,   # paper's "degraded service" threshold
                  low_battery_soc_pct=10.0,    # paper's low-battery penalty threshold
                  omega_1=0.5, omega_2=0.3, omega_3=0.2,
+                 switch_cost=0.0,  # reward penalty per user who changes action vs. last hour;
+                                   # 0.0 (default) matches every existing result in this paper.
+                                   # Added to test whether a cost for reacting late -- rather
+                                   # than anticipating -- is what would make the LSTM forecast
+                                   # valuable, since today's zero-switching-cost, fully-reactive
+                                   # MDP can always react to rain the instant it lands, giving a
+                                   # forecast of it nothing to add.
                  weather_generator=None,
                  seed=0):
         self.n_users = n_users
@@ -121,6 +156,8 @@ class HAPSAssociationEnv:
         self.degraded_threshold_db = degraded_threshold_db
         self.low_battery_soc_pct = low_battery_soc_pct
         self.omega_1, self.omega_2, self.omega_3 = omega_1, omega_2, omega_3
+        self.switch_cost = switch_cost
+        self._prev_actions = None  # (n_users,), reset() clears it; None means "no penalty this hour"
         self.weather_generator = weather_generator
         self.rng = np.random.default_rng(seed)
 
@@ -135,18 +172,28 @@ class HAPSAssociationEnv:
         nodes = cm.haps_constellation_geometry(spacing_km=self.spacing_km, h_haps_m=cm.HAPS_ALT_M)
         self.node_xy_m = np.array([[nodes[k][0], nodes[k][1]] for k in NODE_KEYS])  # (3, 2)
 
-        # Single static relay UAV (Table 1: count=1, no mobility), fixed at the HAPS
-        # triangle's centroid -- the same point Table 1 already assigns the Gateway,
-        # just at UAV altitude. For an equilateral triangle this is equidistant from
-        # all three HAPS (circumradius = spacing/sqrt(3)), so the HAPS->UAV feeder hop
-        # has one constant, moderate elevation (~27.5 deg at 65 km spacing) regardless
-        # of which HAPS relays or which user is served -- unlike a UAV that chases each
-        # user (the previous, incorrect assumption), which swung from near-nadir to an
-        # 11 deg worst case depending on the user's own distance from the HAPS. The
-        # trade-off, now correctly modeled, is that the UAV->UE access hop (2 GHz,
-        # building-blockage-limited) varies with each user's real distance from this
-        # one fixed point instead of being a constant, unrealistically short hop.
-        self.uav_xy_m = self.node_xy_m.mean(axis=0)  # (2,)
+        # Gateway and relay-UAV placement, recomputed here against this
+        # instance's self.spacing_km (the module-level RELAY_FEEDER_DIST_KM/
+        # ELEVATION_DEG above are only the default-spacing values). Default
+        # (static_gw branch, from config/geometry.json): single static relay
+        # UAV (Table 1: count=1, no mobility) at a short 0.1 km horizontal
+        # offset from the SERVING HAPS's own nadir (NODE_KEYS[0]), along the
+        # "good sector" azimuth (away from the two interferers' midpoint,
+        # matching generate_uav_relay_table.py / Fig. 6's spatial-SINR
+        # sector diagram) -- the mirror of the Gateway, whose default
+        # placement is the centroid instead. Since the UAV is pinned to the
+        # serving HAPS specifically (not equidistant from all three, unlike
+        # a centroid placement), the HAPS->UAV feeder hop is a short,
+        # near-zenith (~89.7 deg) link ONLY when relaying through the
+        # serving HAPS; relaying through either interferer HAPS via this
+        # same UAV means a near-grazing feeder hop (the UAV is nowhere near
+        # those HAPS's nadirs) -- intentional, since the UAV is deployed to
+        # assist the serving HAPS, not as a constellation-wide relay.
+        self.relay_feeder_dist_km = compute_placement('gateway', spacing_km=self.spacing_km)['slant_km']
+        self.relay_feeder_elevation_deg = compute_placement('gateway', spacing_km=self.spacing_km)['elevation_deg']
+
+        _s_xy = self.node_xy_m[0]
+        self.uav_xy_m = _s_xy + node_xy_km('uav', spacing_km=self.spacing_km) * 1000.0  # (2,) [m]
         self._dist_haps_uav_m = np.linalg.norm(self.node_xy_m - self.uav_xy_m[None, :], axis=1)  # (3,)
 
         self.weather_state = None
@@ -158,6 +205,9 @@ class HAPSAssociationEnv:
         self._dist_km = None   # (n_users, 3)
         self._relay_capacity = None  # (n_users, 3) bps/Hz, cached per episode (Gateway relay)
         self._uav_relay_capacity = None  # (n_users, 3) bps/Hz, cached per episode (UAV relay)
+        self._uav_feeder_capacity_bps_hz = None  # (3,) bps/Hz, cached per episode
+        self._uav_access_capacity_bps_hz = None  # (n_users,) bps/Hz, cached per episode
+        self.last_feeder_choice = 0  # which HAPS the UAV's feeder is bound to (set by step())
 
     # ------------------------------------------------------------------
     def _init_weather(self):
@@ -206,8 +256,8 @@ class HAPSAssociationEnv:
         relay_capacity = np.zeros((self.n_users, self.n_haps))
         for p in range(self.n_haps):
             relay = cm.relay_two_hop_capacity_bps_hz(
-                feeder_dist_km=RELAY_FEEDER_DIST_KM,
-                feeder_elevation_deg=RELAY_FEEDER_ELEVATION_DEG,
+                feeder_dist_km=self.relay_feeder_dist_km,
+                feeder_elevation_deg=self.relay_feeder_elevation_deg,
                 gw_ue_dist_m=dist_m[:, p],
             )
             relay_capacity[:, p] = relay["capacity_relay_bps_hz"]
@@ -215,6 +265,7 @@ class HAPSAssociationEnv:
         self._relay_capacity = relay_capacity
 
         uav_relay_capacity = np.zeros((self.n_users, self.n_haps))
+        uav_feeder_capacity_bps_hz = np.zeros(self.n_haps)
         for p in range(self.n_haps):
             # Feeder hop (HAPS_p -> UAV): fixed distance, same for every user, since the
             # UAV doesn't move. Access hop (UAV -> UE): real per-user distance to that
@@ -225,7 +276,12 @@ class HAPSAssociationEnv:
                 env=self.env,
             )
             uav_relay_capacity[:, p] = uav_relay["capacity_uav_relay_bps_hz"]
+            uav_feeder_capacity_bps_hz[p] = float(uav_relay["capacity_haps_uav_bps_hz"])
+            # Access-hop capacity doesn't depend on p (same fixed UAV, same per-user
+            # distance for every candidate feeder HAPS); any iteration's value is exact.
+            self._uav_access_capacity_bps_hz = uav_relay["capacity_uav_ue_bps_hz"]
         self._uav_relay_capacity = uav_relay_capacity
+        self._uav_feeder_capacity_bps_hz = uav_feeder_capacity_bps_hz
 
     # ------------------------------------------------------------------
     def reset(self):
@@ -234,6 +290,7 @@ class HAPSAssociationEnv:
         self.hour_of_day = float(self.weather_state.hour_of_day) if self.weather_state else 0.0
         self.soc = self.rng.uniform(self.soc_init_range[0], self.soc_init_range[1], size=self.n_haps)
         self._compute_static_sinr_and_distance()
+        self._prev_actions = None  # no switching penalty on an episode's first hour
         return self._states()
 
     # ------------------------------------------------------------------
@@ -252,11 +309,21 @@ class HAPSAssociationEnv:
         return s
 
     # ------------------------------------------------------------------
-    def step(self, actions):
+    def step(self, actions, feeder_choice=None):
         """actions: array of length n_users, each in {0, ..., n_actions-1}.
         Actions 0..n_haps-1 = direct association with that HAPS; actions
         n_haps..2*n_haps-1 = relay via that HAPS's Gateway; actions
-        2*n_haps..3*n_haps-1 = relay via a UAV served by that HAPS."""
+        2*n_haps..3*n_haps-1 = relay via a UAV served by that HAPS.
+
+        feeder_choice: which single HAPS (0..n_haps-1) the one physical relay UAV's
+        feeder radio is bound to THIS hour -- a per-UAV decision, not a per-user one,
+        since the UAV has one feeder link, not one per user. Every user who picks the
+        UAV-relay action this hour shares that one feeder link's capacity, regardless
+        of which HAPS index their own action happened to encode (the action's HAPS
+        sub-index is only meaningful for the direct actions). If None (the default,
+        used by every rule-based baseline), the feeder is bound by majority vote among
+        this hour's relay-choosing users' own actions -- a reasonable stand-in when no
+        separate feeder policy is making the choice."""
         actions = np.asarray(actions, dtype=int)
         if self.include_gw_relay:
             is_gw_relay = (actions >= self.n_haps) & (actions < 2 * self.n_haps)
@@ -264,8 +331,19 @@ class HAPSAssociationEnv:
         else:
             is_gw_relay = np.zeros(len(actions), dtype=bool)
             is_uav_relay = actions >= self.n_haps
-        serving_haps = actions % self.n_haps  # direct/gw-relay/uav-relay all load the same HAPS's battery
+        serving_haps = actions % self.n_haps  # direct/gw-relay choice of which HAPS to use
         user_idx = np.arange(self.n_users)
+
+        if feeder_choice is None:
+            if np.any(is_uav_relay):
+                feeder_choice = int(np.bincount(serving_haps[is_uav_relay],
+                                                 minlength=self.n_haps).argmax())
+            else:
+                feeder_choice = 0
+        self.last_feeder_choice = int(feeder_choice)
+        # Relay users all bind to the one, shared feeder choice, not their own action's
+        # HAPS sub-index; that sub-index only matters for direct (non-relay) users.
+        serving_haps_billed = np.where(is_uav_relay, self.last_feeder_choice, serving_haps)
 
         # Direct users get their raw SINR; relay users (Gateway or UAV) get
         # an SINR-equivalent derived from their DF relay capacity, so all
@@ -280,15 +358,49 @@ class HAPSAssociationEnv:
             share = self._feeder_capacity_bps_hz / max(n_gw_users, 1)
             gw_relay_capacity = np.minimum(gw_relay_capacity, share)
         gw_relay_sinr_db = 10.0 * np.log10(np.maximum(2.0 ** gw_relay_capacity - 1.0, 1e-15))
-        uav_relay_capacity = self._uav_relay_capacity[user_idx, serving_haps]
+        # UAV relay: every relay user shares the ONE UAV's feeder link, bound to
+        # self.last_feeder_choice this hour, not each user's own action's HAPS index.
+        # Feeder capacity is split equally among this hour's relay users and re-bottlenecked
+        # against each user's own (unshared) access-hop capacity -- decode-and-forward,
+        # so a user's end-to-end rate is still min(feeder share, that user's access hop).
+        #
+        # This feeder hop also carries its OWN, near-zenith rain fade -- small compared to
+        # the backhaul's (shorter slant path through the rain layer), but real and
+        # time-varying, and genuinely different from the direct/service link's (rain-
+        # resilient, \S\ref{sec:channel-models}) exposure. channel_model.py's static,
+        # once-per-episode capacity for this hop only includes FSPL + scintillation, with
+        # no rain term, so it's applied here instead, hourly, the same way the backhaul's
+        # rain de-rates throughput below -- the two are separate fades, not one shared term.
+        rain_mm_h = self.weather_state.rain_mm_h if self.weather_state else 0.0
+        feeder_rain_loss_db = getattr(self, "uav_feeder_rain_att_db", None)
+        if feeder_rain_loss_db is None:
+            feeder_rain_loss_db = uav_feeder_rain_effect_on_capacity(rain_mm_h)["total_rain_loss_db"]
+        feeder_rain_fraction = float(np.clip(10.0 ** (-float(feeder_rain_loss_db) / 10.0), 0.05, 1.0))
+        n_uav_relay = int(np.sum(is_uav_relay))
+        feeder_cap_now = self._uav_feeder_capacity_bps_hz[self.last_feeder_choice] * feeder_rain_fraction
+        feeder_share_bps_hz = feeder_cap_now / max(n_uav_relay, 1)
+        uav_relay_capacity = np.minimum(feeder_share_bps_hz, self._uav_access_capacity_bps_hz)
         uav_relay_sinr_db = 10.0 * np.log10(np.maximum(2.0 ** uav_relay_capacity - 1.0, 1e-15))
         chosen_sinr_db = np.where(
             is_uav_relay, uav_relay_sinr_db,
             np.where(is_gw_relay, gw_relay_sinr_db, direct_sinr_db),
         )
 
-        counts = np.bincount(serving_haps, minlength=self.n_haps).astype(float)
+        counts = np.bincount(serving_haps_billed, minlength=self.n_haps).astype(float)
         user_load_w = counts * self.p_per_user_w
+
+        # Downlink contention: a HAPS's direct-link transmitter and the UAV's access-hop
+        # transmitter are each ONE shared resource too, same as the feeder radio above --
+        # not modelled until now, which silently let every direct user (and every relay
+        # user's own access hop) keep its full, undivided capacity regardless of how many
+        # others shared that same transmitter this hour. Outage classification still uses
+        # the unshared chosen_sinr_db below (is the link itself viable), matching how rain
+        # only de-rates credited throughput, not outage -- contention does the same.
+        direct_mask = ~is_uav_relay & ~is_gw_relay
+        direct_counts = np.bincount(serving_haps[direct_mask], minlength=self.n_haps).astype(float)
+        contention_fraction = np.ones(self.n_users)
+        contention_fraction[direct_mask] = 1.0 / np.maximum(direct_counts[serving_haps[direct_mask]], 1.0)
+        contention_fraction[is_uav_relay] = 1.0 / max(n_uav_relay, 1)
 
         new_soc = np.zeros(self.n_haps)
         for p in range(self.n_haps):
@@ -323,6 +435,16 @@ class HAPSAssociationEnv:
         individual_degraded_penalty = np.where(degraded, -20.0, 0.0)   # per-user share of -20*fraction
         low_battery_penalty = -50.0 * float(np.sum((self.soc < self.low_battery_soc_pct) & (counts > 0)))
 
+        # Switching cost (off by default, switch_cost=0.0): a per-user penalty for changing
+        # action vs. last hour, so reacting to a fade only after it lands is no longer free --
+        # the only lever this env has to make anticipating (the forecast's job) worth more than
+        # reacting (which this zero-cost MDP could always do just as well before).
+        if self.switch_cost > 0.0 and self._prev_actions is not None:
+            individual_switch_penalty = np.where(actions != self._prev_actions, -self.switch_cost, 0.0)
+        else:
+            individual_switch_penalty = np.zeros(self.n_users)
+        self._prev_actions = actions.copy()
+
         # Rain degrades the 38 GHz feeder (backhaul) link, not the 2 GHz
         # service-link SINR above -- so it de-rates only the throughput
         # credit, leaving fairness/energy/outage penalties untouched.
@@ -332,10 +454,9 @@ class HAPSAssociationEnv:
         if override_db is not None:
             rain_loss_db = float(override_db)
         else:
-            rain = self.weather_state.rain_mm_h if self.weather_state else 0.0
-            rain_loss_db = feeder_link_rain_effect_on_capacity(rain)["total_rain_loss_db"]
+            rain_loss_db = feeder_link_rain_effect_on_capacity(rain_mm_h)["total_rain_loss_db"]
         capacity_fraction = float(np.clip(10.0 ** (-rain_loss_db / 10.0), 0.05, 1.0))
-        effective_throughput = individual_throughput * capacity_fraction
+        effective_throughput = individual_throughput * capacity_fraction * contention_fraction
         # Reported fairness: Jain index over per-user delivered throughput (the reward's
         # fairness term above stays on linear SINR, as in the paper's reward definition).
         t_sum, t_sq = float(np.sum(effective_throughput)), float(np.sum(effective_throughput ** 2))
@@ -344,6 +465,7 @@ class HAPSAssociationEnv:
         shared_term = self.omega_2 * jain - self.omega_3 * energy_penalty + low_battery_penalty
         rewards = (self.omega_1 * effective_throughput
                    + individual_severe_penalty + individual_degraded_penalty
+                   + individual_switch_penalty
                    + shared_term)
 
         self.t += 1
@@ -359,7 +481,11 @@ class HAPSAssociationEnv:
             "assoc_counts": counts,
             "feeder_capacity_fraction": capacity_fraction,
             "n_gw_relay": int(np.sum(is_gw_relay)),
-            "n_uav_relay": int(np.sum(is_uav_relay)),
+            "n_uav_relay": n_uav_relay,
+            "feeder_choice": self.last_feeder_choice,
+            "term_switch": float(np.mean(individual_switch_penalty)),
+            "frac_switched": float(np.mean(individual_switch_penalty < 0.0)),
+            "mean_contention_fraction": float(np.mean(contention_fraction)),
             # Additive reward-term decomposition (mean per-user contribution to `rewards`
             # above); does not change any existing field, added for the reviewer-requested
             # reward breakdown (why max-throughput, an upper bound on throughput alone, can

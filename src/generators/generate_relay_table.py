@@ -7,6 +7,15 @@ convention (see generate_pathloss_table.py); the relay path additionally
 bottlenecks against the 38 GHz HAPS->Gateway backhaul link via
 relay_two_hop_capacity_bps_hz() (decode-and-forward), including backhaul-hop
 scintillation and an optional rain-derated backhaul-hop scenario.
+
+The Gateway's placement (default: static_gw branch geometry, fixed at the
+HAPS triangle's centroid -- the mirror of the static UAV relay's placement
+in generate_uav_relay_table.py, which sits near the serving HAPS's own
+nadir instead) is read from config/geometry.json via
+models.geometry_config.compute_placement("gateway"), not hardcoded here.
+Edit config/geometry.json (or use notebooks/geometry_control_panel.ipynb)
+to change it; the backhaul hop's slant distance/elevation are derived from
+whatever that placement resolves to.
 """
 
 import sys
@@ -20,6 +29,7 @@ from models.channel_model import (
     HAPS_ALT_M, GATEWAY_ALT_M, P_TX_HAPS_DBM, NOISE_DBM,
 )
 from models.battery_model import feeder_link_rain_effect_on_capacity
+from models.geometry_config import compute_placement
 
 # Create output directories
 os.makedirs('appendix_data', exist_ok=True)
@@ -28,12 +38,13 @@ os.makedirs('appendix_tables', exist_ok=True)
 USER_ALT_M = 1.5
 FREQ_SERVICE_HZ = 2.0e9
 
-# Fixed backhaul-hop geometry: Gateway is co-located near the HAPS ground
-# nadir point (matches generate_pathloss_table.py's 10-500 m backhaul-distance
-# convention), so the elevation angle from the HAPS to the Gateway is close
-# to 90 degrees regardless of the (short) horizontal offset.
-FEEDER_DIST_KM = 0.1
-FEEDER_ELEVATION_DEG = 89.0
+# Gateway placement, from config/geometry.json (defaults to today's
+# static_gw centroid placement if that file doesn't exist yet -- see
+# models/geometry_config.py). The backhaul hop's slant range and elevation
+# angle are derived from whatever placement is configured there.
+_GW_PLACEMENT = compute_placement('gateway')
+FEEDER_DIST_KM = _GW_PLACEMENT['slant_km']
+FEEDER_ELEVATION_DEG = _GW_PLACEMENT['elevation_deg']
 
 # Access-hop (Gateway->UE) distances: same range as the direct service link,
 # so the two paths are directly comparable.
@@ -83,7 +94,8 @@ for dist_km in DISTANCES_ACCESS_KM:
 df = pd.DataFrame(results)
 
 print(df.to_string(index=False))
-print(f"\nBackhaul hop (fixed): dist={FEEDER_DIST_KM} km, elevation={FEEDER_ELEVATION_DEG} deg")
+print(f"\nBackhaul hop (Gateway placement mode={_GW_PLACEMENT['mode']}): "
+      f"dist={FEEDER_DIST_KM:.2f} km, elevation={FEEDER_ELEVATION_DEG:.2f} deg")
 print("Note: relay capacity is decode-and-forward, bottlenecked by min(backhaul, access) capacity.")
 
 # ============================================================================
@@ -117,7 +129,7 @@ latex_appendix = f"""\\begin{{table}}[htbp]
 \\centering
 \\small
 {latex_main}
-\\caption{{Table A.2: Direct (HAPS\\textrightarrow UE) vs. relay (HAPS\\textrightarrow Gateway\\textrightarrow UE) link comparison. The relay path is decode-and-forward, combining the 38\\,GHz backhaul hop (fixed at {FEEDER_DIST_KM}\\,km, {FEEDER_ELEVATION_DEG}$^\\circ$ elevation, with ITU-P.618 scintillation) and the 2\\,GHz Gateway\\textrightarrow UE access hop (same band/power convention as the direct service link) as $C_{{\\text{{relay}}}} = \\min(C_{{\\text{{backhaul}}}}, C_{{\\text{{access}}}})$. A 10\\,mm/h rain scenario de-rates the backhaul hop per ITU-R P.838.}}
+\\caption{{Table A.2: Direct (HAPS\\textrightarrow UE) vs. relay (HAPS\\textrightarrow Gateway\\textrightarrow UE) link comparison. The Gateway is static, fixed at the HAPS triangle's centroid ({FEEDER_DIST_KM:.1f}\\,km slant range, {FEEDER_ELEVATION_DEG:.1f}$^\\circ$ elevation from the serving HAPS). The relay path is decode-and-forward, combining the 38\\,GHz backhaul hop (fixed geometry, with ITU-P.618 scintillation) and the 2\\,GHz Gateway\\textrightarrow UE access hop (same band/power convention as the direct service link) as $C_{{\\text{{relay}}}} = \\min(C_{{\\text{{backhaul}}}}, C_{{\\text{{access}}}})$. A 10\\,mm/h rain scenario de-rates the backhaul hop per ITU-R P.838.}}
 \\label{{table:app-relay-comparison}}
 \\end{{table}}
 """

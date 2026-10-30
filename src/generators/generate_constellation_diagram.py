@@ -13,12 +13,19 @@ Output: constellation_with_sectors.png
 For integration into LaTeX Figure 11 (Constellation Geometry with Spatial Sectors)
 """
 
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))  # Add src/ to path
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle, FancyArrowPatch
 from matplotlib.collections import PatchCollection
 import matplotlib.patches as mpatches
+
+from models.geometry_config import node_xy_km, load_geometry
 
 def load_spatial_data_50km():
     """Load SINR data at r=50 km only"""
@@ -59,6 +66,27 @@ def create_constellation_diagram():
     # Draw triangle
     triangle = np.array([S, I1, I2, S])
     ax.plot(triangle[:, 0], triangle[:, 1], 'k--', linewidth=1.5, alpha=0.4, label='Constellation (65 km triangle)')
+
+    # Gateway and relay-UAV placement, read from config/geometry.json via
+    # models.geometry_config (defaults to today's static_gw geometry --
+    # Gateway at the triangle's centroid, UAV at a short 0.1 km offset from
+    # the serving HAPS's nadir along the good-sector azimuth, away from the
+    # two interferers' midpoint -- if that file doesn't exist yet). Same
+    # placement source as generate_relay_table.py / generate_uav_relay_table.py,
+    # so this diagram always matches the geometry those tables were built from.
+    _geometry = load_geometry()
+    gw_xy_km = node_xy_km('gateway', _geometry, spacing_km=SPACING_KM)
+    uav_offset_km = node_xy_km('uav', _geometry, spacing_km=SPACING_KM)
+    uav_offset_norm = np.linalg.norm(uav_offset_km)
+    uav_dir = (uav_offset_km / uav_offset_norm) if uav_offset_norm > 1e-9 else np.array([1.0, 0.0])
+    uav_xy = S + 5.0 * uav_dir  # drawn at 5 km (exaggerated from the real offset, often 0.1 km) for visibility
+
+    gw_label = f"Gateway ({_geometry['gateway'].get('mode', 'centroid')})"
+    uav_label = f"UAV ({_geometry['uav'].get('mode', 'serving_nadir')})"
+    ax.plot(*gw_xy_km, 'g^', markersize=18, markeredgewidth=2, markeredgecolor='darkgreen',
+            label=gw_label, zorder=10)
+    ax.plot(*uav_xy, 'mD', markersize=14, markeredgewidth=2, markeredgecolor='purple',
+            label=uav_label, zorder=10)
 
     # Plot user positions at r=50 km with SINR color coding
     sinr_values = df.sort_values('angle_deg')['SINR_dB'].values
@@ -154,6 +182,8 @@ def create_constellation_diagram():
     ax.legend(handles=[
         mpatches.Patch(color='b', label='S (Serving)', alpha=0.7),
         mpatches.Patch(color='r', label='I1, I2 (Interferers)', alpha=0.7),
+        mpatches.Patch(color='darkgreen', label=gw_label, alpha=0.7),
+        mpatches.Patch(color='purple', label=uav_label, alpha=0.7),
         red_patch, yellow_patch, blue_patch, green_patch
     ], fontsize=11, loc='upper left', framealpha=0.95)
 
